@@ -438,41 +438,87 @@ a:hover {
 /* ---------- Song Detail ---------- */
 .song-detail-hero {
   position: relative;
+  min-height: 460px;
   border-radius: var(--radius-xl);
   overflow: hidden;
   margin-bottom: var(--sp-xl);
+  border: 1px solid var(--border-card);
+  background: linear-gradient(135deg, rgba(124, 92, 252, 0.18), rgba(13, 10, 26, 0.92) 58%);
+  isolation: isolate;
+}
+
+.song-detail-artwork {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg-secondary);
 }
 
 .song-detail-cover {
   width: 100%;
-  max-height: 300px;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
 
 .song-detail-cover-placeholder {
   width: 100%;
-  height: 200px;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(124, 92, 252, 0.2) 100%);
-  font-size: 5rem;
+  font-size: 6rem;
 }
 
 .song-detail-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: var(--sp-xl) var(--sp-lg);
-  background: linear-gradient(to top, rgba(13, 10, 26, 0.95), transparent);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  justify-content: flex-end;
+  min-height: 460px;
+  width: 100%;
+  padding: var(--sp-xl);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 18%, rgba(0, 0, 0, 0.86) 100%);
+}
+
+.song-detail-kicker {
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.song-detail-subtitle {
+  max-width: 44ch;
+  color: rgba(240, 236, 255, 0.76);
+}
+
+.song-detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+}
+
+.song-detail-stats span {
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(13, 10, 26, 0.32);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  backdrop-filter: blur(10px);
 }
 
 .song-detail-title {
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-4xl);
   font-weight: 800;
-  margin-bottom: var(--sp-sm);
+  line-height: 1.05;
+  text-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
 }
 
 .back-btn {
@@ -754,6 +800,12 @@ a:hover {
   line-height: 1.6;
 }
 
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--sp-md);
+}
+
 .mention-tag {
   display: inline;
   padding: 1px 6px;
@@ -937,8 +989,8 @@ a:hover {
 }
 
 .member-avatar {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-full);
   background: var(--accent-gradient);
   display: flex;
@@ -951,8 +1003,8 @@ a:hover {
 }
 
 .member-avatar-image {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-full);
   object-fit: cover;
   display: block;
@@ -1134,10 +1186,10 @@ a:hover {
 
 .profile-choice-avatar,
 .profile-choice-avatar-image {
-  width: 56px;
-  height: 56px;
+  width: 76px;
+  height: 76px;
   border-radius: var(--radius-full);
-  margin-bottom: var(--sp-xs);
+  margin-bottom: var(--sp-sm);
 }
 
 .profile-choice-avatar {
@@ -1146,14 +1198,16 @@ a:hover {
   justify-content: center;
   background: var(--accent-gradient);
   color: white;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   font-weight: 700;
+  box-shadow: var(--shadow-md);
 }
 
 .profile-choice-avatar-image {
   object-fit: cover;
   display: block;
   border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-md);
 }
 
 .profile-choice-name {
@@ -1176,25 +1230,53 @@ a:hover {
 
 /* ---------- Profile Detail ---------- */
 .profile-detail-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-lg);
+  position: relative;
+  padding: 0;
+  min-height: 420px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(145deg, rgba(124, 92, 252, 0.22), rgba(13, 10, 26, 0.94) 72%),
+    var(--bg-card);
 }
 
-.profile-hero-main {
+.profile-detail-hero.has-artwork::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--hero-image);
+  background-size: cover;
+  background-position: center;
+  z-index: -2;
+}
+
+.profile-detail-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 12%, rgba(0, 0, 0, 0.88) 100%);
+  z-index: -1;
+}
+
+.profile-detail-overlay {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: center;
-  gap: var(--sp-md);
-  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--sp-sm);
+  min-height: 420px;
+  padding: var(--sp-xl);
 }
 
 .profile-hero-avatar,
 .profile-hero-avatar-image {
-  width: 88px;
-  height: 88px;
+  width: 120px;
+  height: 120px;
   border-radius: var(--radius-full);
-  flex-shrink: 0;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.35);
+  margin-bottom: var(--sp-sm);
 }
 
 .profile-hero-avatar {
@@ -1203,7 +1285,7 @@ a:hover {
   justify-content: center;
   background: var(--accent-gradient);
   color: white;
-  font-size: var(--fs-2xl);
+  font-size: 3rem;
   font-weight: 700;
 }
 
@@ -1215,9 +1297,15 @@ a:hover {
 
 .profile-detail-actions {
   display: flex;
-  align-items: center;
   gap: var(--sp-sm);
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+  margin-top: var(--sp-sm);
+}
+
+.profile-detail-overlay .profile-detail-subtitle {
+  color: rgba(240, 236, 255, 0.8);
 }
 
 .profile-rename-card {
@@ -1322,10 +1410,69 @@ a:hover {
   background: linear-gradient(180deg, rgba(34, 197, 94, 0.08), transparent), var(--bg-card);
 }
 
+.profile-comment-header {
+  align-items: flex-start;
+  gap: var(--sp-sm);
+}
+
+.profile-comment-meta {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-sm);
+  min-width: 0;
+}
+
+.profile-comment-meta-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.profile-comment-author-avatar,
+.profile-comment-author-avatar-image {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.profile-comment-author-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.profile-comment-author-avatar-image {
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border-card);
+}
+
+.profile-comment-meta-copy .comment-author {
+  display: block;
+  line-height: 1.2;
+}
+
+.profile-comment-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-md);
+  flex-wrap: wrap;
+}
+
 .profile-comment-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--sp-md);
+  margin-top: 0;
 }
 
 .profile-status-btn,
@@ -1347,6 +1494,42 @@ a:hover {
 .profile-song-link {
   margin-left: var(--sp-xs);
   padding: 2px 10px;
+}
+
+.profile-song-link-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-sm);
+  align-self: flex-start;
+  width: auto;
+  max-width: 100%;
+  margin-left: 0;
+  padding: 4px 12px 4px 4px;
+}
+
+.profile-song-link-card span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-comment-song-cover {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+}
+
+.profile-comment-song-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(124, 92, 252, 0.18) 100%);
+  font-size: 1rem;
 }
 
 .profile-status-btn:hover,
@@ -1687,6 +1870,28 @@ a:hover {
     gap: var(--sp-md);
   }
 
+  .song-detail-hero {
+    min-height: 360px;
+  }
+
+  .song-detail-overlay {
+    min-height: 360px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .song-detail-subtitle {
+    max-width: none;
+  }
+
+  .song-detail-stats {
+    justify-content: center;
+  }
+
+  .song-detail-title {
+    font-size: var(--fs-3xl);
+  }
+
   .rehearsal-section {
     flex-direction: column;
     text-align: center;
@@ -1713,7 +1918,17 @@ a:hover {
   }
 
   .profile-detail-hero {
-    flex-direction: column;
+    min-height: 360px;
+  }
+
+  .profile-hero-avatar,
+  .profile-hero-avatar-image {
+    width: 96px;
+    height: 96px;
+  }
+
+  .profile-detail-overlay {
+    min-height: 360px;
   }
 
   .setlist-detail-hero {
@@ -1734,6 +1949,15 @@ a:hover {
   .profile-hero-main,
   .profile-danger-card {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-comment-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-comment-footer {
     align-items: flex-start;
   }
 

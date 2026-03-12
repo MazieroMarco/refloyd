@@ -98,7 +98,9 @@ router.get('/:id/comments', (req, res) => {
         c.id,
         c.song_id,
         s.name AS song_name,
+        s.cover_image AS song_cover_image,
         COALESCE(author_member.name, c.author) AS author_name,
+        author_member.avatar_image AS author_avatar_image,
         c.text,
         c.created_at,
         cm.is_done

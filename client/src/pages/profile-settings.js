@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { clearCurrentProfileId, getCurrentProfileId, navigate, setCurrentProfileId, showToast } from '../main.js';
-import { escapeHtml, getProfileAvatarHtml } from '../utils.js';
+import { applyHeroImage, escapeHtml, getProfileAvatarHtml } from '../utils.js';
 
 export async function renderProfileSettings(container, params) {
     const profileId = params[0];
@@ -13,20 +13,21 @@ export async function renderProfileSettings(container, params) {
 
     const member = await api.getMember(profileId);
     const isCurrentProfile = String(member.id) === getCurrentProfileId();
+    const heroAvatarHtml = member.avatar_image
+        ? ''
+        : getProfileAvatarHtml(member, 'profile-hero-avatar-image', 'profile-hero-avatar');
 
     container.innerHTML = `
     <button class="back-btn" id="back-to-profile">← Back to mentions</button>
     <section class="profile-detail-hero">
-      <div class="profile-hero-main">
-        ${getProfileAvatarHtml(member, 'profile-hero-avatar-image', 'profile-hero-avatar')}
-        <div class="profile-detail-copy">
-          <p class="profile-detail-kicker">Profile settings</p>
-          <h1>${escapeHtml(member.name)}</h1>
-          <p class="profile-detail-subtitle">Update the profile name and picture without mixing that work into the mentions view.</p>
+      <div class="profile-detail-overlay">
+        ${heroAvatarHtml}
+        <p class="profile-detail-kicker">Profile settings</p>
+        <h1>${escapeHtml(member.name)}</h1>
+        <p class="profile-detail-subtitle">Update the profile name and picture without mixing that work into the mentions view.</p>
+        <div class="profile-detail-actions">
+          <button class="rehearse-btn" id="activate-profile-btn">${isCurrentProfile ? 'Current profile' : 'Use this profile'}</button>
         </div>
-      </div>
-      <div class="profile-detail-actions">
-        <button class="rehearse-btn" id="activate-profile-btn">${isCurrentProfile ? 'Current profile' : 'Use this profile'}</button>
       </div>
     </section>
 
@@ -77,8 +78,11 @@ export async function renderProfileSettings(container, params) {
     const fileInput = container.querySelector('#avatar-file');
     const saveButton = container.querySelector('#save-profile-btn');
     const deleteButton = container.querySelector('#delete-profile-btn');
+    const hero = container.querySelector('.profile-detail-hero');
 
     let selectedFile = null;
+
+    applyHeroImage(hero, member.avatar_image);
 
     backButton.addEventListener('click', () => {
         navigate(`profile/${member.id}`);

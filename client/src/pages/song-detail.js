@@ -15,7 +15,7 @@ export async function renderSongDetail(container, params, context = {}) {
     const currentProfile = context.currentProfile || null;
     const [song, initialComments] = await Promise.all([
         api.getSong(songId),
-        api.getComments(songId),
+        api.getComments(songId, currentProfile?.id),
     ]);
     const comments = [...initialComments];
 
@@ -33,9 +33,17 @@ export async function renderSongDetail(container, params, context = {}) {
         ? `<img class="song-detail-cover" src="${song.cover_image}" alt="${escapeHtml(song.name)}" />`
         : '<div class="song-detail-cover-placeholder">🎵</div>';
     hero.innerHTML = `
-      ${coverHtml}
+      <div class="song-detail-artwork">
+        ${coverHtml}
+      </div>
       <div class="song-detail-overlay">
+        <p class="song-detail-kicker">Song</p>
         <h1 class="song-detail-title">${escapeHtml(song.name)}</h1>
+        <p class="song-detail-subtitle">Keep the arrangement, notes, and rehearsal history in one place.</p>
+        <div class="song-detail-stats">
+          <span>${song.rehearsal_count} rehearsals</span>
+          <span id="song-comment-stat">${comments.length} notes</span>
+        </div>
       </div>
     `;
     container.appendChild(hero);
@@ -101,8 +109,9 @@ export async function renderSongDetail(container, params, context = {}) {
     const commentInput = commentsSection.querySelector('#comment-input');
     const commentSubmit = commentsSection.querySelector('#comment-submit');
     const mentionDropdown = commentsSection.querySelector('#mention-dropdown');
+    const commentStat = hero.querySelector('#song-comment-stat');
 
-    renderComments(commentList, comments, handleDeleteComment);
+    renderCommentList();
     setupMentionAutocomplete(commentInput, mentionDropdown, members);
 
     commentSubmit.addEventListener('click', async () => {
@@ -119,15 +128,14 @@ export async function renderSongDetail(container, params, context = {}) {
 
         commentSubmit.disabled = true;
         try {
-            const comment = await api.addComment(songId, {
+            await api.addComment(songId, {
                 authorId: currentProfile.id,
                 author: currentProfile.name,
                 text,
             });
 
-            comments.unshift(comment);
             commentInput.value = '';
-            renderComments(commentList, comments, handleDeleteComment);
+            await refreshComments();
             showToast('Note posted');
         } catch (err) {
             showToast('Failed to post note');
@@ -175,15 +183,49 @@ export async function renderSongDetail(container, params, context = {}) {
             if (commentIndex >= 0) {
                 comments.splice(commentIndex, 1);
             }
-            renderComments(commentList, comments, handleDeleteComment);
+            renderCommentList();
             showToast('Note deleted');
         } catch (err) {
             showToast('Failed to delete note');
         }
     }
+
+    async function handleToggleCommentStatus(commentId) {
+        if (!currentProfile) {
+            return;
+        }
+
+        const comment = comments.find((item) => item.id === commentId);
+        if (!comment || !comment.viewer_is_mentioned) {
+            return;
+        }
+
+        try {
+            const nextDoneState = !comment.viewer_is_done;
+            await api.updateCommentStatus(commentId, currentProfile.id, nextDoneState);
+            comment.viewer_is_done = nextDoneState ? 1 : 0;
+            renderCommentList();
+            showToast(nextDoneState ? 'Marked as done' : 'Moved back to open');
+        } catch (err) {
+            showToast('Failed to update note status');
+        }
+    }
+
+    async function refreshComments() {
+        const updatedComments = await api.getComments(songId, currentProfile?.id);
+        comments.splice(0, comments.length, ...updatedComments);
+        renderCommentList();
+    }
+
+    function renderCommentList() {
+        if (commentStat) {
+            commentStat.textContent = `${comments.length} note${comments.length === 1 ? '' : 's'}`;
+        }
+        renderComments(commentList, comments, handleDeleteComment, handleToggleCommentStatus);
+    }
 }
 
-function renderComments(container, comments, onDeleteComment) {
+function renderComments(container, comments, onDeleteComment, onToggleCommentStatus) {
     if (comments.length === 0) {
         container.innerHTML = `
       <div class="empty-state">
@@ -197,13 +239,20 @@ function renderComments(container, comments, onDeleteComment) {
 
     container.innerHTML = '';
     comments.forEach((comment) => {
-        container.appendChild(createCommentElement(comment, onDeleteComment));
+        container.appendChild(createCommentElement(comment, onDeleteComment, onToggleCommentStatus));
     });
 }
 
-function createCommentElement(comment, onDeleteComment) {
+function createCommentElement(comment, onDeleteComment, onToggleCommentStatus) {
     const element = document.createElement('div');
     element.className = 'comment-item';
+    const isMentionedForViewer = Boolean(Number(comment.viewer_is_mentioned));
+    const isDoneForViewer = Boolean(Number(comment.viewer_is_done));
+    const statusButtonHtml = isMentionedForViewer
+        ? `<div class="comment-actions">
+        <button class="profile-status-btn" data-action="status" type="button">${isDoneForViewer ? 'Move back to open' : 'Mark as done'}</button>
+      </div>`
+        : '';
     element.innerHTML = `
     <div class="comment-header">
       <span class="comment-author">${escapeHtml(comment.author_name || comment.author)}</span>
@@ -213,11 +262,17 @@ function createCommentElement(comment, onDeleteComment) {
       </div>
     </div>
     <div class="comment-text">${formatMentions(escapeHtml(comment.text))}</div>
+    ${statusButtonHtml}
   `;
 
     element.querySelector('.comment-delete-btn').addEventListener('click', (event) => {
         event.stopPropagation();
         onDeleteComment(comment.id);
+    });
+
+    element.querySelector('[data-action="status"]')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onToggleCommentStatus(comment.id);
     });
 
     return element;

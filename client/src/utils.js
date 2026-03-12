@@ -22,6 +22,15 @@ export function getProfileAvatarHtml(profile, imageClass, fallbackClass = imageC
     return `<div class="${fallbackClass}">${escapeHtml(getInitials(profile?.name || 'P'))}</div>`;
 }
 
+export function applyHeroImage(element, imageUrl) {
+    if (!element || !imageUrl) {
+        return;
+    }
+
+    element.classList.add('has-artwork');
+    element.style.setProperty('--hero-image', `url("${imageUrl}")`);
+}
+
 export function formatMentions(text) {
     return text.replace(/@(\w+(?:\s\w+)*)/g, '<span class="mention-tag">@$1</span>');
 }

@@ -4,7 +4,7 @@ const { syncCommentMentionsForComment } = require('../services/mentions');
 
 const router = express.Router();
 
-const commentSelect = `
+const commentSelectFields = `
   SELECT
     c.id,
     c.song_id,
@@ -13,15 +13,44 @@ const commentSelect = `
     COALESCE(m.name, c.author) AS author_name,
     c.text,
     c.created_at
+`;
+
+const commentSelectFrom = `
   FROM comments c
   LEFT JOIN members m ON m.id = c.author_id
 `;
 
+const commentSelect = `
+  ${commentSelectFields}
+  ${commentSelectFrom}
+`;
+
 // GET /api/songs/:songId/comments — List comments for a song
 router.get('/songs/:songId/comments', (req, res) => {
+    const viewerMemberId = Number.parseInt(req.query.memberId, 10);
+    const hasViewerMember = Number.isInteger(viewerMemberId) && viewerMemberId > 0;
+    const viewerSelect = hasViewerMember
+        ? `,
+    CASE WHEN cm.member_id IS NULL THEN 0 ELSE 1 END AS viewer_is_mentioned,
+    cm.is_done AS viewer_is_done`
+        : `,
+    0 AS viewer_is_mentioned,
+    NULL AS viewer_is_done`;
+    const viewerJoin = hasViewerMember
+        ? 'LEFT JOIN comment_mentions cm ON cm.comment_id = c.id AND cm.member_id = ?'
+        : '';
+    const params = hasViewerMember
+        ? [viewerMemberId, req.params.songId]
+        : [req.params.songId];
+
     const comments = db.prepare(
-        `${commentSelect} WHERE c.song_id = ? ORDER BY c.created_at DESC`
-    ).all(req.params.songId);
+        `${commentSelectFields}
+        ${viewerSelect}
+        ${commentSelectFrom}
+        ${viewerJoin}
+        WHERE c.song_id = ?
+        ORDER BY c.created_at DESC`
+    ).all(...params);
     res.json(comments);
 });
 

@@ -71,7 +71,7 @@ export const api = {
     deleteSetlist: (id) => request(`/setlists/${id}`, { method: 'DELETE' }),
 
     // Comments
-    getComments: (songId) => request(`/songs/${songId}/comments`),
+    getComments: (songId, memberId) => request(`/songs/${songId}/comments${createQuery({ memberId })}`),
     addComment: (songId, data) => request(`/songs/${songId}/comments`, {
         method: 'POST',
         body: JSON.stringify(data),
