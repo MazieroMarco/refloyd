@@ -35,11 +35,18 @@ const upload = multer({
 
 // GET /api/songs — List all songs
 router.get('/', (req, res) => {
+    const sortOrder = {
+        newest: 's.created_at DESC, s.id DESC',
+        'least-rehearsed': 's.rehearsal_count ASC, LOWER(s.name) ASC, s.id ASC',
+        'most-rehearsed': 's.rehearsal_count DESC, LOWER(s.name) ASC, s.id ASC',
+        name: 'LOWER(s.name) ASC, s.id ASC',
+    };
+    const selectedSort = sortOrder[req.query.sort] ? req.query.sort : 'newest';
     const songs = db.prepare(`
     SELECT s.*, 
       (SELECT COUNT(*) FROM comments c WHERE c.song_id = s.id) as comment_count
     FROM songs s 
-    ORDER BY s.created_at DESC
+    ORDER BY ${sortOrder[selectedSort]}
   `).all();
     res.json(songs);
 });

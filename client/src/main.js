@@ -4,6 +4,9 @@ import { renderAddSong } from './pages/add-song.js';
 import { renderProfiles } from './pages/members.js';
 import { renderProfileDetail } from './pages/profile-detail.js';
 import { renderProfilePicker } from './pages/profile-picker.js';
+import { renderAddSetlist, renderEditSetlist } from './pages/setlist-editor.js';
+import { renderSetlistDetail } from './pages/setlist-detail.js';
+import { renderSetlistList } from './pages/setlist-list.js';
 import { renderSongDetail } from './pages/song-detail.js';
 import { renderSongList } from './pages/song-list.js';
 import './styles/index.css';
@@ -17,6 +20,10 @@ const routes = {
     'songs': renderSongList,
     'song': renderSongDetail,
     'add-song': renderAddSong,
+    'setlists': renderSetlistList,
+    'setlist': renderSetlistDetail,
+    'add-setlist': renderAddSetlist,
+    'edit-setlist': renderEditSetlist,
     'profiles': renderProfiles,
     'members': renderProfiles,
     'profile': renderProfileDetail,

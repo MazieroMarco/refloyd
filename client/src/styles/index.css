@@ -112,7 +112,7 @@ body {
   position: relative;
   isolation: isolate;
   background:
-    linear-gradient(180deg, rgba(48, 34, 16, 0.98) 0%, rgba(13, 10, 26, 1) 55%, rgba(13, 10, 26, 1) 100%);
+    linear-gradient(180deg, rgba(28, 12, 35, 0.98) 0%, rgba(13, 10, 26, 1) 55%, rgba(13, 10, 26, 1) 100%);
 }
 
 #app::before {
@@ -779,6 +779,25 @@ a:hover {
   background: rgba(239, 68, 68, 0.1);
 }
 
+/* ---------- Song Toolbar ---------- */
+.toolbar-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  min-width: 220px;
+}
+
+.toolbar-select span {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toolbar-select .form-input {
+  min-width: 170px;
+}
+
 /* ---------- Add Song Form ---------- */
 .add-song-form {
   max-width: 500px;
@@ -975,6 +994,16 @@ a:hover {
 .member-select-btn:hover {
   border-color: var(--border-focus);
   background: var(--bg-input-focus);
+}
+
+.member-select-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.member-select-btn:disabled:hover {
+  border-color: var(--border-card);
+  background: var(--bg-input);
 }
 
 .member-delete-btn {
@@ -1241,6 +1270,251 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-md);
+  flex-wrap: wrap;
+}
+
+/* ---------- Setlists ---------- */
+.setlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-lg);
+  margin-top: var(--sp-lg);
+}
+
+.setlist-card {
+  padding: var(--sp-lg);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(145deg, rgba(124, 92, 252, 0.1), transparent 55%),
+    var(--bg-card);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  backdrop-filter: blur(10px);
+}
+
+.setlist-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(124, 92, 252, 0.3);
+  box-shadow: var(--shadow-lg);
+}
+
+.setlist-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  align-items: flex-start;
+}
+
+.setlist-card-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.setlist-card-title {
+  margin-top: var(--sp-xs);
+  font-size: var(--fs-xl);
+}
+
+.setlist-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+  margin-top: var(--sp-lg);
+}
+
+.setlist-preview-pill {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-input);
+  border: 1px solid var(--border-card);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.setlist-detail-hero,
+.setlist-editor-panel {
+  padding: var(--sp-xl);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(140deg, rgba(124, 92, 252, 0.12), transparent 55%),
+    var(--bg-card);
+  backdrop-filter: blur(10px);
+}
+
+.setlist-detail-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-lg);
+}
+
+.setlist-detail-actions {
+  display: flex;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+}
+
+.setlist-delete-btn {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+
+.setlist-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.22);
+  box-shadow: none;
+}
+
+.setlist-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  margin-top: var(--sp-lg);
+}
+
+.setlist-song-card {
+  display: grid;
+  grid-template-columns: auto 72px minmax(0, 1fr);
+  gap: var(--sp-md);
+  align-items: center;
+  padding: var(--sp-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.setlist-song-card:hover {
+  border-color: rgba(124, 92, 252, 0.35);
+  box-shadow: var(--shadow-md);
+}
+
+.setlist-song-order,
+.setlist-editor-position {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-glow);
+  color: var(--accent-secondary);
+  font-weight: 700;
+}
+
+.setlist-song-cover,
+.setlist-song-cover-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+}
+
+.setlist-song-cover {
+  object-fit: cover;
+  display: block;
+}
+
+.setlist-song-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(124, 92, 252, 0.18) 100%);
+  font-size: var(--fs-2xl);
+}
+
+.setlist-song-copy,
+.setlist-editor-song {
+  min-width: 0;
+}
+
+.setlist-song-title,
+.setlist-editor-song-name {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.setlist-editor-shell {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.setlist-editor-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.setlist-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-sm);
+}
+
+.setlist-helper-text {
+  margin-top: var(--sp-sm);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.setlist-editor-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-md);
+}
+
+.setlist-summary-pill {
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--accent-glow);
+  color: var(--accent-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.setlist-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-lg);
+}
+
+.setlist-editor-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sp-md);
+  align-items: center;
+  padding: var(--sp-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+}
+
+.setlist-editor-row-actions {
+  display: flex;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.setlist-remove-btn {
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.setlist-remove-btn:hover {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.16);
 }
 
 /* ---------- Toast / Notification ---------- */
@@ -1303,7 +1577,8 @@ a:hover {
   .profile-rename-form,
   .identity-actions,
   .identity-current,
-  .add-member-form {
+  .add-member-form,
+  .setlist-detail-actions {
     width: 100%;
   }
 
@@ -1322,6 +1597,16 @@ a:hover {
     flex-direction: column;
   }
 
+  .setlist-detail-hero {
+    flex-direction: column;
+  }
+
+  .setlist-picker-row,
+  .setlist-song-card,
+  .setlist-editor-row {
+    grid-template-columns: 1fr;
+  }
+
   .profile-choice-meta {
     flex-direction: column;
     align-items: flex-start;
@@ -1335,6 +1620,11 @@ a:hover {
     padding: var(--sp-sm) var(--sp-md);
   }
 
+  .app-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   .fab {
     bottom: var(--sp-lg);
     right: var(--sp-lg);
@@ -1342,5 +1632,32 @@ a:hover {
 
   h1 {
     font-size: var(--fs-2xl);
+  }
+
+  .toolbar-select {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-select .form-input {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .setlist-song-order,
+  .setlist-editor-position {
+    margin: 0 auto;
+  }
+
+  .setlist-song-cover,
+  .setlist-song-cover-placeholder {
+    margin: 0 auto;
+  }
+
+  .setlist-song-copy,
+  .setlist-editor-song,
+  .setlist-editor-row-actions {
+    text-align: center;
+    justify-content: center;
   }
 }

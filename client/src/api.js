@@ -1,5 +1,18 @@
 const API_BASE = '/api';
 
+function createQuery(params) {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            searchParams.set(key, value);
+        }
+    });
+
+    const queryString = searchParams.toString();
+    return queryString ? `?${queryString}` : '';
+}
+
 async function request(path, options = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
         headers: { 'Content-Type': 'application/json', ...options.headers },
@@ -14,7 +27,7 @@ async function request(path, options = {}) {
 
 export const api = {
     // Songs
-    getSongs: () => request('/songs'),
+    getSongs: (sort) => request(`/songs${createQuery({ sort })}`),
     getSong: (id) => request(`/songs/${id}`),
     addSong: async (formData) => {
         const res = await fetch(`${API_BASE}/songs`, { method: 'POST', body: formData });
@@ -29,6 +42,19 @@ export const api = {
         body: JSON.stringify({ delta }),
     }),
     deleteSong: (id) => request(`/songs/${id}`, { method: 'DELETE' }),
+
+    // Setlists
+    getSetlists: () => request('/setlists'),
+    getSetlist: (id) => request(`/setlists/${id}`),
+    createSetlist: (data) => request('/setlists', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    updateSetlist: (id, data) => request(`/setlists/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    }),
+    deleteSetlist: (id) => request(`/setlists/${id}`, { method: 'DELETE' }),
 
     // Comments
     getComments: (songId) => request(`/songs/${songId}/comments`),

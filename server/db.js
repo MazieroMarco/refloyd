@@ -24,6 +24,23 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS setlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS setlist_songs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    setlist_id INTEGER NOT NULL,
+    song_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    FOREIGN KEY (setlist_id) REFERENCES setlists(id) ON DELETE CASCADE,
+    FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE,
+    UNIQUE (setlist_id, position)
+  );
+
   CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     song_id INTEGER NOT NULL,
@@ -55,6 +72,8 @@ if (!hasColumn('comments', 'author_id')) {
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_comments_author_id ON comments(author_id);
   CREATE INDEX IF NOT EXISTS idx_comment_mentions_member_done ON comment_mentions(member_id, is_done);
+  CREATE INDEX IF NOT EXISTS idx_setlist_songs_setlist_position ON setlist_songs(setlist_id, position);
+  CREATE INDEX IF NOT EXISTS idx_setlist_songs_song_id ON setlist_songs(song_id);
 `);
 
 // Seed default members if table is empty
