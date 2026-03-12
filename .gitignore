@@ -1,0 +1,58 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Node dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+.cache/
+.eslintcache
+*.tsbuildinfo
+client/dist/
+
+# Runtime files
+tmp/
+temp/
+*.pid
+*.pid.lock
+
+# Server data and uploads
+server/data.db
+server/data.db-shm
+server/data.db-wal
+server/uploads/
+
+# Package manager leftovers
+.npm/
+.pnpm-store/
+
+# Misc
+*.local
