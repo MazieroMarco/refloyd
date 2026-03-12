@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { navigate, setCurrentProfileId, showToast } from '../main.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, getProfileAvatarHtml } from '../utils.js';
 
 export async function renderProfilePicker(container, params, context = {}) {
     const profiles = context.members?.length ? [...context.members] : await api.getMembers();
@@ -62,7 +62,13 @@ function renderProfileChoices(grid, profiles) {
         const button = document.createElement('button');
         button.className = 'profile-choice-card';
         button.type = 'button';
+        const avatarHtml = getProfileAvatarHtml(
+            profile,
+            'profile-choice-avatar-image',
+            'profile-choice-avatar'
+        );
         button.innerHTML = `
+      ${avatarHtml}
       <div class="profile-choice-name">${escapeHtml(profile.name)}</div>
       <div class="profile-choice-meta">
         <span>${profile.open_comment_count || 0} open notes</span>

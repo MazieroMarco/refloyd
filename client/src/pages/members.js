@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { clearCurrentProfileId, getCurrentProfileId, navigate, setCurrentProfileId, showToast } from '../main.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, getProfileAvatarHtml } from '../utils.js';
 
 export async function renderProfiles(container, params, context = {}) {
     const profiles = context.members?.length ? context.members : await api.getMembers();
@@ -69,16 +69,11 @@ function createProfileCard(profile, profiles, grid) {
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
 
-    const initials = profile.name
-        .split(' ')
-        .map((part) => part[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+    const avatarHtml = getProfileAvatarHtml(profile, 'member-avatar-image', 'member-avatar');
 
     card.innerHTML = `
     <button class="member-delete-btn" title="Remove">✕</button>
-    <div class="member-avatar">${initials}</div>
+    ${avatarHtml}
     <div class="member-name">${escapeHtml(profile.name)}</div>
     <div class="member-status-row">
       <span class="member-note-badge">${profile.open_comment_count || 0} open</span>
@@ -86,6 +81,7 @@ function createProfileCard(profile, profiles, grid) {
     </div>
     <div class="member-card-actions">
       <button class="member-select-btn">${isCurrentProfile ? 'Current profile' : 'Use this profile'}</button>
+      <button class="member-select-btn member-edit-btn" type="button">Edit profile</button>
     </div>
   `;
 
@@ -104,6 +100,11 @@ function createProfileCard(profile, profiles, grid) {
         setCurrentProfileId(profile.id);
         showToast(`${profile.name} is now active`);
         navigate(`profile/${profile.id}`);
+    });
+
+    card.querySelector('.member-edit-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        navigate(`profile-settings/${profile.id}`);
     });
 
     card.querySelector('.member-delete-btn').addEventListener('click', async (event) => {

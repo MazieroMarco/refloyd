@@ -13,6 +13,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
+    avatar_image TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -67,6 +68,10 @@ function hasColumn(tableName, columnName) {
 
 if (!hasColumn('comments', 'author_id')) {
   db.exec('ALTER TABLE comments ADD COLUMN author_id INTEGER REFERENCES members(id) ON DELETE SET NULL');
+}
+
+if (!hasColumn('members', 'avatar_image')) {
+  db.exec('ALTER TABLE members ADD COLUMN avatar_image TEXT');
 }
 
 db.exec(`

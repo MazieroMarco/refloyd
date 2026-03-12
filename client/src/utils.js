@@ -4,6 +4,24 @@ export function escapeHtml(text) {
     return div.innerHTML;
 }
 
+export function getInitials(text = '') {
+    return text
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+}
+
+export function getProfileAvatarHtml(profile, imageClass, fallbackClass = imageClass) {
+    if (profile?.avatar_image) {
+        return `<img class="${imageClass}" src="${profile.avatar_image}" alt="${escapeHtml(profile.name || 'Profile')}" loading="lazy" />`;
+    }
+
+    return `<div class="${fallbackClass}">${escapeHtml(getInitials(profile?.name || 'P'))}</div>`;
+}
+
 export function formatMentions(text) {
     return text.replace(/@(\w+(?:\s\w+)*)/g, '<span class="mention-tag">@$1</span>');
 }

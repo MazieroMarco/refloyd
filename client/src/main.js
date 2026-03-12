@@ -4,6 +4,7 @@ import { renderAddSong } from './pages/add-song.js';
 import { renderProfiles } from './pages/members.js';
 import { renderProfileDetail } from './pages/profile-detail.js';
 import { renderProfilePicker } from './pages/profile-picker.js';
+import { renderProfileSettings } from './pages/profile-settings.js';
 import { renderAddSetlist, renderEditSetlist } from './pages/setlist-editor.js';
 import { renderSetlistDetail } from './pages/setlist-detail.js';
 import { renderSetlistList } from './pages/setlist-list.js';
@@ -27,6 +28,7 @@ const routes = {
     'profiles': renderProfiles,
     'members': renderProfiles,
     'profile': renderProfileDetail,
+    'profile-settings': renderProfileSettings,
     'choose-profile': renderProfilePicker,
 };
 

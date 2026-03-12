@@ -25,6 +25,20 @@ async function request(path, options = {}) {
     return res.json();
 }
 
+async function multipartRequest(path, method, formData) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        body: formData,
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || 'Request failed');
+    }
+
+    return res.json();
+}
+
 export const api = {
     // Songs
     getSongs: (sort) => request(`/songs${createQuery({ sort })}`),
@@ -70,11 +84,24 @@ export const api = {
 
     // Members
     getMembers: () => request('/members'),
+    getMember: (id) => request(`/members/${id}`),
     getMemberComments: (id) => request(`/members/${id}/comments`),
-    addMember: (name) => request('/members', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-    }),
+    addMember: (data) => (
+        data instanceof FormData
+            ? multipartRequest('/members', 'POST', data)
+            : request('/members', {
+                method: 'POST',
+                body: JSON.stringify({ name: data }),
+            })
+    ),
+    updateMember: (id, data) => (
+        data instanceof FormData
+            ? multipartRequest(`/members/${id}`, 'PATCH', data)
+            : request(`/members/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(data),
+            })
+    ),
     renameMember: (id, name) => request(`/members/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name }),

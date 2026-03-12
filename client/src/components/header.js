@@ -21,7 +21,7 @@ export function renderHeader(activePage, { currentProfile } = {}) {
       <nav class="app-nav">
         <button class="nav-btn ${['', 'songs', 'song', 'add-song'].includes(activePage) ? 'active' : ''}" data-page="songs">Songs</button>
         <button class="nav-btn ${['setlists', 'setlist', 'add-setlist', 'edit-setlist'].includes(activePage) ? 'active' : ''}" data-page="setlists">Setlists</button>
-        <button class="nav-btn ${['profiles', 'members', 'profile'].includes(activePage) ? 'active' : ''}" data-page="profiles">Profiles</button>
+        <button class="nav-btn ${['profiles', 'members', 'profile', 'profile-settings'].includes(activePage) ? 'active' : ''}" data-page="profiles">Profiles</button>
       </nav>
     </header>
     <div class="identity-bar">

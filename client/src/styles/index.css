@@ -950,6 +950,16 @@ a:hover {
   color: white;
 }
 
+.member-avatar-image {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  display: block;
+  margin: 0 auto var(--sp-sm);
+  border: 1px solid var(--border-card);
+}
+
 .member-name {
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -1103,6 +1113,9 @@ a:hover {
 }
 
 .profile-choice-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   padding: var(--sp-lg);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
@@ -1117,6 +1130,30 @@ a:hover {
   transform: translateY(-3px);
   border-color: rgba(124, 92, 252, 0.35);
   box-shadow: var(--shadow-md);
+}
+
+.profile-choice-avatar,
+.profile-choice-avatar-image {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--sp-xs);
+}
+
+.profile-choice-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.profile-choice-avatar-image {
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border-card);
 }
 
 .profile-choice-name {
@@ -1145,9 +1182,42 @@ a:hover {
   gap: var(--sp-lg);
 }
 
+.profile-hero-main {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  min-width: 0;
+}
+
+.profile-hero-avatar,
+.profile-hero-avatar-image {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.profile-hero-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+}
+
+.profile-hero-avatar-image {
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border-card);
+}
+
 .profile-detail-actions {
   display: flex;
   align-items: center;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
 }
 
 .profile-rename-card {
@@ -1155,6 +1225,55 @@ a:hover {
   grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-md);
   margin-top: var(--sp-lg);
+}
+
+.profile-settings-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-md);
+}
+
+.profile-avatar-upload {
+  max-width: 320px;
+  padding: var(--sp-xl);
+}
+
+.profile-avatar-preview,
+.profile-avatar-preview-image {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  margin: 0 auto var(--sp-sm);
+}
+
+.profile-avatar-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+}
+
+.profile-avatar-preview-image {
+  width: 96px;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-danger-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-lg);
+  margin-top: var(--sp-lg);
+  padding: var(--sp-xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background:
+    linear-gradient(140deg, rgba(239, 68, 68, 0.1), transparent 58%),
+    var(--bg-card);
 }
 
 .profile-rename-form {
@@ -1612,6 +1731,12 @@ a:hover {
     align-items: flex-start;
   }
 
+  .profile-hero-main,
+  .profile-danger-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .identity-bar {
     align-items: flex-start;
   }
@@ -1659,5 +1784,9 @@ a:hover {
   .setlist-editor-row-actions {
     text-align: center;
     justify-content: center;
+  }
+
+  .profile-avatar-upload {
+    max-width: none;
   }
 }
