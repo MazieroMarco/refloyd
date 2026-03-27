@@ -1,10 +1,13 @@
 import { navigate } from '../main.js';
 import { buildBackendUrl } from '../config.js';
 
+let previousNavPage = '';
+
 export function renderHeader(activePage, { authSession, currentProfile } = {}) {
     const wrapper = document.createElement('div');
     wrapper.className = 'app-topbar';
     const authLabel = getAuthLabel(authSession);
+    const currentNavPage = getNavPage(activePage);
 
     if (!currentProfile) {
         wrapper.innerHTML = `
@@ -35,9 +38,10 @@ export function renderHeader(activePage, { authSession, currentProfile } = {}) {
     <header class="app-header">
       <button class="app-logo plain-button" id="logo">Re:Floyd</button>
       <nav class="app-nav">
-        <button class="nav-btn ${['', 'songs', 'song', 'add-song'].includes(activePage) ? 'active' : ''}" data-page="songs">Songs</button>
-        <button class="nav-btn ${['setlists', 'setlist', 'add-setlist', 'edit-setlist'].includes(activePage) ? 'active' : ''}" data-page="setlists">Setlists</button>
-        <button class="nav-btn ${['profiles', 'members', 'profile', 'profile-settings'].includes(activePage) ? 'active' : ''}" data-page="profiles">Profiles</button>
+        <span class="nav-indicator" aria-hidden="true"></span>
+        <button class="nav-btn ${currentNavPage === 'songs' ? 'active' : ''}" data-page="songs">Songs</button>
+        <button class="nav-btn ${currentNavPage === 'setlists' ? 'active' : ''}" data-page="setlists">Setlists</button>
+        <button class="nav-btn ${currentNavPage === 'profiles' ? 'active' : ''}" data-page="profiles">Profiles</button>
       </nav>
     </header>
     <div class="identity-bar">
@@ -56,6 +60,10 @@ export function renderHeader(activePage, { authSession, currentProfile } = {}) {
       </div>
     </div>
   `;
+
+    requestAnimationFrame(() => {
+        syncNavIndicator(wrapper.querySelector('.app-nav'), currentNavPage);
+    });
 
     wrapper.querySelector('.app-header').addEventListener('click', (event) => {
         const navButton = event.target.closest('.nav-btn');
@@ -79,6 +87,78 @@ export function renderHeader(activePage, { authSession, currentProfile } = {}) {
     bindLogout(wrapper);
 
     return wrapper;
+}
+
+function getNavPage(activePage) {
+    if (['', 'songs', 'song', 'add-song'].includes(activePage)) {
+        return 'songs';
+    }
+
+    if (['setlists', 'setlist', 'add-setlist', 'edit-setlist'].includes(activePage)) {
+        return 'setlists';
+    }
+
+    if (['profiles', 'members', 'profile', 'profile-settings'].includes(activePage)) {
+        return 'profiles';
+    }
+
+    return '';
+}
+
+function syncNavIndicator(nav, currentNavPage) {
+    if (!nav || !currentNavPage) {
+        previousNavPage = currentNavPage;
+        return;
+    }
+
+    const indicator = nav.querySelector('.nav-indicator');
+    const activeButton = nav.querySelector(`.nav-btn[data-page="${currentNavPage}"]`);
+
+    if (!indicator || !activeButton) {
+        previousNavPage = currentNavPage;
+        return;
+    }
+
+    const previousButton = previousNavPage
+        ? nav.querySelector(`.nav-btn[data-page="${previousNavPage}"]`)
+        : null;
+
+    const positionIndicator = (button) => {
+        indicator.style.width = `${button.offsetWidth}px`;
+        indicator.style.transform = `translateX(${button.offsetLeft}px)`;
+    };
+
+    indicator.classList.add('is-visible');
+
+    if (previousButton && previousButton !== activeButton) {
+        requestAnimationFrame(() => {
+            indicator.style.transition = 'none';
+            positionIndicator(previousButton);
+
+            requestAnimationFrame(() => {
+                indicator.style.transition = '';
+                positionIndicator(activeButton);
+            });
+        });
+    } else {
+        requestAnimationFrame(() => {
+            indicator.style.transition = 'none';
+            positionIndicator(activeButton);
+            requestAnimationFrame(() => {
+                indicator.style.transition = '';
+            });
+        });
+    }
+
+    requestAnimationFrame(() => {
+        if (indicator.offsetWidth === 0) {
+            indicator.style.transition = 'none';
+            positionIndicator(activeButton);
+            indicator.style.transition = '';
+        }
+    });
+
+    previousNavPage = currentNavPage;
 }
 
 function bindLogout(wrapper) {
