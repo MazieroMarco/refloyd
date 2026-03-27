@@ -100,8 +100,11 @@ The backend now requires Postgres. Set these values on the server:
 - `DATABASE_URL` — required Postgres connection string
 - `DATABASE_SSL` — optional override for SSL (`true` or `false`)
 - `DATABASE_SSL_REJECT_UNAUTHORIZED` — optional SSL certificate validation toggle, defaults to `false` when SSL is enabled
+- `DATABASE_SSL_CA` — optional CA certificate PEM contents for providers like Aiven
+- `DATABASE_SSL_CA_FILE` — optional path to a CA certificate PEM file
 
 If `DATABASE_SSL` is left unset, Re:Floyd enables SSL automatically for non-local Postgres hosts and leaves it off for `localhost`.
+If you provide `DATABASE_SSL_CA` or `DATABASE_SSL_CA_FILE`, Re:Floyd enables certificate verification automatically.
 
 ## OIDC Access Control
 
