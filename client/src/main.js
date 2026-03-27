@@ -1,6 +1,7 @@
-import { api } from './api.js';
+import { AUTH_REQUIRED_EVENT, api } from './api.js';
 import { renderHeader } from './components/header.js';
 import { renderAddSong } from './pages/add-song.js';
+import { renderAuthGate } from './pages/auth-gate.js';
 import { renderProfiles } from './pages/members.js';
 import { renderProfileDetail } from './pages/profile-detail.js';
 import { renderProfilePicker } from './pages/profile-picker.js';
@@ -14,6 +15,8 @@ import './styles/index.css';
 
 const CURRENT_PROFILE_KEY = 'refloyd-profile-id';
 const LEGACY_PROFILE_KEY = 'repetifloyd-member';
+const AUTH_SUBJECT_KEY = 'refloyd-auth-subject';
+let authSession = null;
 
 // Simple hash-based router
 const routes = {
@@ -66,6 +69,76 @@ export function clearCurrentProfileId() {
     localStorage.removeItem(LEGACY_PROFILE_KEY);
 }
 
+function clearStoredAuthSubject() {
+    localStorage.removeItem(AUTH_SUBJECT_KEY);
+}
+
+function syncAuthSubject(nextAuthSession) {
+    if (!nextAuthSession?.enabled) {
+        clearStoredAuthSubject();
+        return;
+    }
+
+    if (!nextAuthSession.authenticated || !nextAuthSession.user?.subject) {
+        clearCurrentProfileId();
+        clearStoredAuthSubject();
+        return;
+    }
+
+    const nextSubject = nextAuthSession.user.subject;
+    const previousSubject = localStorage.getItem(AUTH_SUBJECT_KEY);
+
+    if (previousSubject !== nextSubject) {
+        clearCurrentProfileId();
+    }
+
+    localStorage.setItem(AUTH_SUBJECT_KEY, nextSubject);
+}
+
+function consumeAuthError() {
+    const url = new URL(window.location.href);
+    const authError = url.searchParams.get('authError');
+
+    if (!authError) {
+        return '';
+    }
+
+    url.searchParams.delete('authError');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    return authError;
+}
+
+async function ensureAuthSession(force = false) {
+    if (!force && authSession) {
+        return authSession;
+    }
+
+    authSession = await api.getAuthSession();
+    syncAuthSubject(authSession);
+    return authSession;
+}
+
+function renderAppShell(app, page, nextAuthSession, currentProfile) {
+    app.innerHTML = '';
+    app.appendChild(renderHeader(page, {
+        authSession: nextAuthSession,
+        currentProfile,
+    }));
+
+    const content = document.createElement('main');
+    content.className = 'main-content page-enter';
+    app.appendChild(content);
+    return content;
+}
+
+function renderAuthScreen(app, page, nextAuthSession, errorMessage = '') {
+    const content = renderAppShell(app, page, nextAuthSession, null);
+    renderAuthGate(content, {
+        providerName: nextAuthSession?.providerName || 'Single Sign-On',
+        errorMessage,
+    });
+}
+
 export function showToast(message) {
     let toast = document.querySelector('.toast');
     if (!toast) {
@@ -110,6 +183,27 @@ async function render() {
     const app = document.getElementById('app');
     const { page, params } = getRoute();
     const routeHandler = routes[page] || routes[''];
+    const authError = consumeAuthError();
+    let nextAuthSession;
+
+    try {
+        nextAuthSession = await ensureAuthSession();
+    } catch (err) {
+        const content = renderAppShell(app, page, null, null);
+        content.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">Authentication setup issue</div>
+        <div class="empty-state-desc">${err.message}</div>
+      </div>
+    `;
+        return;
+    }
+
+    if (nextAuthSession.enabled && !nextAuthSession.authenticated) {
+        renderAuthScreen(app, page, nextAuthSession, authError);
+        return;
+    }
 
     let members = [];
     let currentProfile = null;
@@ -118,6 +212,12 @@ async function render() {
         members = await api.getMembers();
         currentProfile = resolveStoredProfile(members);
     } catch (err) {
+        if (err.code === 'AUTH_REQUIRED') {
+            authSession = { ...nextAuthSession, authenticated: false, user: null };
+            renderAuthScreen(app, page, authSession, 'Your session expired. Please sign in again.');
+            return;
+        }
+
         members = [];
         currentProfile = null;
     }
@@ -127,16 +227,17 @@ async function render() {
         return;
     }
 
-    app.innerHTML = '';
-    app.appendChild(renderHeader(page, { members, currentProfile }));
-
-    const content = document.createElement('main');
-    content.className = 'main-content page-enter';
-    app.appendChild(content);
+    const content = renderAppShell(app, page, nextAuthSession, currentProfile);
 
     try {
         await routeHandler(content, params, { members, currentProfile });
     } catch (err) {
+        if (err.code === 'AUTH_REQUIRED') {
+            authSession = { ...nextAuthSession, authenticated: false, user: null };
+            renderAuthScreen(app, page, authSession, 'Your session expired. Please sign in again.');
+            return;
+        }
+
         content.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">⚠️</div>
@@ -148,6 +249,15 @@ async function render() {
 }
 
 window.addEventListener('hashchange', () => {
+    render();
+});
+
+window.addEventListener(AUTH_REQUIRED_EVENT, () => {
+    authSession = authSession?.enabled
+        ? { ...authSession, authenticated: false, user: null }
+        : null;
+    clearCurrentProfileId();
+    clearStoredAuthSubject();
     render();
 });
 
