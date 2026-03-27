@@ -218,7 +218,7 @@ async function completeAuthentication(query) {
         sub: idTokenClaims.sub,
     });
 
-    const session = createSession(user, tokenSet.id_token);
+    const session = await createSession(user, tokenSet.id_token);
 
     return {
         sessionId: session.id,
@@ -227,12 +227,12 @@ async function completeAuthentication(query) {
     };
 }
 
-function getSessionFromRequest(req, options = {}) {
+async function getSessionFromRequest(req, options = {}) {
     if (!settings.enabled) {
         return null;
     }
 
-    cleanupExpiredSessions();
+    await cleanupExpiredSessions();
 
     const cookies = parseCookies(req.headers.cookie);
     const sessionId = cookies[SESSION_COOKIE_NAME];
@@ -240,11 +240,15 @@ function getSessionFromRequest(req, options = {}) {
         return null;
     }
 
-    const row = db.prepare(`
+    const result = await db.query(
+        `
       SELECT id, user_json, id_token, expires_at
       FROM auth_sessions
-      WHERE id = ? AND expires_at > ?
-    `).get(sessionId, new Date().toISOString());
+      WHERE id = $1 AND expires_at > $2
+    `,
+        [sessionId, new Date().toISOString()]
+    );
+    const row = result.rows[0];
 
     if (!row) {
         return null;
@@ -254,7 +258,7 @@ function getSessionFromRequest(req, options = {}) {
     try {
         user = JSON.parse(row.user_json);
     } catch (err) {
-        db.prepare('DELETE FROM auth_sessions WHERE id = ?').run(row.id);
+        await db.query('DELETE FROM auth_sessions WHERE id = $1', [row.id]);
         return null;
     }
 
@@ -266,26 +270,29 @@ function getSessionFromRequest(req, options = {}) {
     };
 }
 
-function createSession(user, idToken) {
-    cleanupExpiredSessions();
+async function createSession(user, idToken) {
+    await cleanupExpiredSessions();
 
     const sessionId = randomToken();
     const expiresAt = new Date(Date.now() + settings.sessionTtlMs).toISOString();
 
-    db.prepare(`
+    await db.query(
+        `
       INSERT INTO auth_sessions (id, subject, user_json, id_token, expires_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(sessionId, user.subject, JSON.stringify(user), idToken || null, expiresAt);
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+        [sessionId, user.subject, JSON.stringify(user), idToken || null, expiresAt]
+    );
 
     return { id: sessionId, expiresAt };
 }
 
-function destroySession(sessionId) {
+async function destroySession(sessionId) {
     if (!sessionId) {
         return;
     }
 
-    db.prepare('DELETE FROM auth_sessions WHERE id = ?').run(sessionId);
+    await db.query('DELETE FROM auth_sessions WHERE id = $1', [sessionId]);
 }
 
 function setSessionCookie(res, sessionId, expiresAt) {
@@ -683,8 +690,8 @@ function cleanupPendingAuthorizations() {
     }
 }
 
-function cleanupExpiredSessions() {
-    db.prepare('DELETE FROM auth_sessions WHERE expires_at <= ?').run(new Date().toISOString());
+async function cleanupExpiredSessions() {
+    await db.query('DELETE FROM auth_sessions WHERE expires_at <= $1', [new Date().toISOString()]);
 }
 
 function parseCookies(rawCookieHeader = '') {

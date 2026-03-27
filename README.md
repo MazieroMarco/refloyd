@@ -2,7 +2,7 @@
 
 Re:Floyd is a lightweight rehearsal tracker for bands. It lets you manage songs, count rehearsals, leave improvement notes, mention band profiles, and track which mentioned notes are still open or already done.
 
-The project is split into a small vanilla JavaScript frontend and an Express + SQLite backend.
+The project is split into a small vanilla JavaScript frontend and an Express + Postgres backend.
 
 ## Features
 
@@ -15,13 +15,13 @@ The project is split into a small vanilla JavaScript frontend and an Express + S
 - Open a dedicated profile detail page to see all mentions
 - Mark mentioned notes as `DONE` per profile
 - Rename, add, switch, and delete profiles
-- Persist data locally in SQLite
+- Persist rehearsal data in Postgres
 
 ## Stack
 
 - Frontend: Vanilla JavaScript, Vite, plain CSS
 - Backend: Node.js, Express
-- Database: SQLite via `better-sqlite3`
+- Database: PostgreSQL via `pg`
 - Uploads: `multer`
 
 ## Project Structure
@@ -37,10 +37,10 @@ The project is split into a small vanilla JavaScript frontend and an Express + S
 │   │   ├── api.js           # Frontend API client
 │   │   └── main.js          # Router and app bootstrap
 │   └── vite.config.js
-├── server/                  # Express API and SQLite setup
+├── server/                  # Express API and Postgres setup
 │   ├── routes/              # Songs, comments, profiles
 │   ├── services/            # Mention synchronization helpers
-│   ├── db.js                # SQLite schema and migrations
+│   ├── db.js                # Postgres connection and schema bootstrap
 │   └── index.js             # Server entrypoint
 └── README.md
 ```
@@ -62,7 +62,14 @@ cd ../client
 npm install
 ```
 
-Run the backend:
+Before starting the backend, set a Postgres connection string. `server/.env` is the intended place for local development:
+
+```bash
+cd server
+cp .env.example .env
+```
+
+Set `DATABASE_URL` in `server/.env` to your hosted Postgres database, then run the backend:
 
 ```bash
 cd server
@@ -86,6 +93,16 @@ The Vite dev server proxies `/api` and `/uploads` to the backend on `http://loca
 
 For production, the frontend also loads a separate runtime config file at `client/public/app-config.js`. You can point the built app at a different backend URL there without rebuilding the JavaScript bundle.
 
+## Database Configuration
+
+The backend now requires Postgres. Set these values on the server:
+
+- `DATABASE_URL` — required Postgres connection string
+- `DATABASE_SSL` — optional override for SSL (`true` or `false`)
+- `DATABASE_SSL_REJECT_UNAUTHORIZED` — optional SSL certificate validation toggle, defaults to `false` when SSL is enabled
+
+If `DATABASE_SSL` is left unset, Re:Floyd enables SSL automatically for non-local Postgres hosts and leaves it off for `localhost`.
+
 ## OIDC Access Control
 
 Re:Floyd can require OIDC sign-in before someone can access the app. That sign-in is only used as an access gate. After login, the person still chooses any in-app profile exactly like before.
@@ -98,6 +115,7 @@ If your frontend and backend are hosted on different public origins in productio
 
 ### Required server environment
 
+- `DATABASE_URL` — the Postgres connection string used by the backend
 - `APP_ORIGIN` — the public browser origin for the app. In local development this should be `http://localhost:5173`
 - `BACKEND_ORIGIN` — optional public origin for the backend when it is hosted separately from the frontend
 - `OIDC_ISSUER_URL` or `OIDC_DISCOVERY_URL` — your provider issuer or full discovery URL
@@ -136,15 +154,24 @@ That path is handled by the Express backend through the Vite dev proxy, which ke
 
 - `npm run dev` starts the Express API with `nodemon`
 - `npm start` starts the Express API with Node
+- `npm run migrate:sqlite` copies data from `server/data.db` into an empty Postgres database
 
 ## Data and Storage
 
-Re:Floyd stores its local data in:
+Re:Floyd stores its application data in Postgres. Uploaded song and profile images still live on the server filesystem in:
 
-- `server/data.db` for SQLite data
 - `server/uploads/` for uploaded song cover images
 
-These files are intentionally ignored by Git.
+If you already have local SQLite data in `server/data.db`, you can move it into an empty Postgres database with:
+
+```bash
+cd server
+npm run migrate:sqlite
+```
+
+You can also point the migration at a different SQLite file with `SQLITE_PATH=/absolute/path/to/file.db npm run migrate:sqlite`.
+
+The migration intentionally stops if the Postgres database already contains app data.
 
 On startup, the backend also synchronizes stored comment mentions so profile mention status stays consistent after profile renames or schema updates.
 
@@ -219,7 +246,7 @@ This repository ignores:
 - dependencies
 - build output
 - local editor files
-- SQLite database files
+- legacy SQLite database files
 - uploaded images
 - environment files
 
@@ -230,7 +257,7 @@ That makes it safe to publish the source without leaking local runtime state.
 Before pushing the repository to GitHub, it is worth checking:
 
 1. `client/node_modules` and `server/node_modules` are not tracked
-2. `server/data.db*` and `server/uploads/` are not tracked
+2. `server/uploads/` and any legacy `server/data.db*` files are not tracked
 3. `client/dist/` is not tracked unless you explicitly want built assets in Git
 4. you add a `LICENSE` file if you want the repo to be open source
 

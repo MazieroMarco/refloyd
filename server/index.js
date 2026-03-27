@@ -2,6 +2,7 @@ require('./load-env');
 const cors = require('cors');
 const express = require('express');
 const path = require('path');
+const { initDatabase } = require('./db');
 const { syncAllCommentMentions } = require('./services/mentions');
 const { requireAuth } = require('./middleware/require-auth');
 const { getAppOrigin, getRedirectUri, isEnabled } = require('./services/oidc');
@@ -38,8 +39,6 @@ app.use('/api/setlists', requireAuth, require('./routes/setlists'));
 app.use('/api/members', requireAuth, require('./routes/members'));
 app.use('/api', requireAuth, require('./routes/comments'));
 
-syncAllCommentMentions();
-
 app.use((err, req, res, next) => {
     console.error(err);
     if (res.headersSent) {
@@ -49,9 +48,19 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-    console.log(`Re:Floyd server running on http://localhost:${PORT}`);
-    if (isEnabled()) {
-        console.log(`OIDC access control enabled. Register this callback URL: ${getRedirectUri()}`);
-    }
+async function start() {
+    await initDatabase();
+    await syncAllCommentMentions();
+
+    app.listen(PORT, () => {
+        console.log(`Re:Floyd server running on http://localhost:${PORT}`);
+        if (isEnabled()) {
+            console.log(`OIDC access control enabled. Register this callback URL: ${getRedirectUri()}`);
+        }
+    });
+}
+
+start().catch((err) => {
+    console.error('Failed to start Re:Floyd server', err);
+    process.exit(1);
 });

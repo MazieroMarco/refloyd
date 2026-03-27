@@ -1,4 +1,5 @@
 const express = require('express');
+const { asyncHandler } = require('../utils/async-handler');
 const {
     beginAuthentication,
     buildAppUrl,
@@ -15,7 +16,7 @@ const {
 
 const router = express.Router();
 
-router.get('/session', (req, res) => {
+router.get('/session', asyncHandler(async (req, res) => {
     if (!isEnabled()) {
         return res.json({
             enabled: false,
@@ -25,7 +26,7 @@ router.get('/session', (req, res) => {
         });
     }
 
-    const session = getSessionFromRequest(req);
+    const session = await getSessionFromRequest(req);
     if (!session) {
         return res.json({
             enabled: true,
@@ -42,9 +43,9 @@ router.get('/session', (req, res) => {
         user: session.user,
         expiresAt: session.expiresAt,
     });
-});
+}));
 
-router.get('/login', async (req, res) => {
+router.get('/login', asyncHandler(async (req, res) => {
     const returnTo = sanitizeReturnTo(req.query.returnTo);
 
     if (!isEnabled()) {
@@ -60,9 +61,9 @@ router.get('/login', async (req, res) => {
             authError: 'Unable to start single sign-on. Check the OIDC server settings.',
         }));
     }
-});
+}));
 
-router.get('/callback', async (req, res) => {
+router.get('/callback', asyncHandler(async (req, res) => {
     try {
         const { sessionId, expiresAt, returnTo } = await completeAuthentication(req.query);
         setSessionCookie(res, sessionId, expiresAt);
@@ -73,14 +74,14 @@ router.get('/callback', async (req, res) => {
             authError: err.message || 'Authentication failed. Please try again.',
         }));
     }
-});
+}));
 
-router.get('/logout', async (req, res) => {
+router.get('/logout', asyncHandler(async (req, res) => {
     const returnTo = sanitizeReturnTo(req.query.returnTo, '');
-    const session = getSessionFromRequest(req, { includeIdToken: true });
+    const session = await getSessionFromRequest(req, { includeIdToken: true });
 
     if (session?.id) {
-        destroySession(session.id);
+        await destroySession(session.id);
     }
 
     clearSessionCookie(res);
@@ -99,6 +100,6 @@ router.get('/logout', async (req, res) => {
     }
 
     res.redirect(buildAppUrl(returnTo));
-});
+}));
 
 module.exports = router;
