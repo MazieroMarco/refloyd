@@ -129,8 +129,10 @@ If your frontend and backend are hosted on different public origins in productio
 - `OIDC_SCOPE` — defaults to `openid profile email`
 - `OIDC_PROVIDER_NAME` — label shown in the login UI
 - `OIDC_SESSION_TTL_HOURS` — local session lifetime, defaults to `12`
-- `OIDC_SESSION_COOKIE_SAME_SITE` — cookie SameSite policy, defaults to `Lax`
+- `OIDC_SESSION_COOKIE_SAME_SITE` — cookie SameSite policy. Defaults to `None` when frontend and backend use different HTTPS origins, otherwise `Lax`
 - `OIDC_AUTHORIZATION_EXTRA_PARAMS` — extra auth request params as a query string, for example `prompt=login&audience=https%3A%2F%2Fapi.example.com`
+
+If your frontend and backend are hosted on different public origins, set `OIDC_SESSION_COOKIE_SAME_SITE=None` or use the automatic default above. Without that, the browser will usually drop the auth cookie on frontend-to-backend API calls after login.
 
 ### Local development callback
 

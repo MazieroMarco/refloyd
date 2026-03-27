@@ -28,7 +28,7 @@ function loadSettings() {
     const providerName = (process.env.OIDC_PROVIDER_NAME || '').trim() || DEFAULT_PROVIDER_NAME;
     const sessionTtlHours = Number(process.env.OIDC_SESSION_TTL_HOURS || '12');
     const sessionCookieSameSite = normalizeSameSite(
-        process.env.OIDC_SESSION_COOKIE_SAME_SITE || 'Lax'
+        process.env.OIDC_SESSION_COOKIE_SAME_SITE || getDefaultSameSite(appOrigin, backendOrigin)
     );
     const clientAuthMethod = (process.env.OIDC_CLIENT_AUTH_METHOD || '').trim()
         || (clientSecret ? 'client_secret_basic' : 'none');
@@ -753,6 +753,24 @@ function normalizeSameSite(value) {
 
     if (normalized === 'none') {
         return 'None';
+    }
+
+    return 'Lax';
+}
+
+function getDefaultSameSite(appOrigin, backendOrigin) {
+    try {
+        const appUrl = new URL(appOrigin);
+        const backendUrl = new URL(backendOrigin);
+
+        if (
+            backendUrl.protocol === 'https:'
+            && (appUrl.protocol !== backendUrl.protocol || appUrl.host !== backendUrl.host)
+        ) {
+            return 'None';
+        }
+    } catch (err) {
+        return 'Lax';
     }
 
     return 'Lax';
