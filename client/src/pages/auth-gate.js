@@ -1,7 +1,7 @@
 import { buildBackendUrl } from '../config.js';
 
 export function renderAuthGate(container, { providerName, errorMessage } = {}) {
-    container.innerHTML = `
+  container.innerHTML = `
     <section class="auth-gate">
       <div class="auth-gate-card">
         <div class="auth-gate-grid">
@@ -13,7 +13,7 @@ export function renderAuthGate(container, { providerName, errorMessage } = {}) {
             </p>
             <div class="auth-gate-actions">
               <button class="add-member-btn auth-gate-login-btn" type="button" id="auth-login-btn">
-                Continue with ${escapeHtml(providerName || 'Single Sign-On')}
+                Continue with Google or Microsoft
               </button>
               <span class="auth-gate-meta">Authentication only controls access. Profiles stay independent.</span>
             </div>
@@ -24,7 +24,7 @@ export function renderAuthGate(container, { providerName, errorMessage } = {}) {
             <div class="auth-gate-step-list">
               <div class="auth-gate-step">
                 <span class="auth-gate-step-number">1</span>
-                <p>Use your OIDC account to unlock the app.</p>
+                <p>Use your Google or Microsoft account to unlock the app.</p>
               </div>
               <div class="auth-gate-step">
                 <span class="auth-gate-step-number">2</span>
@@ -41,24 +41,24 @@ export function renderAuthGate(container, { providerName, errorMessage } = {}) {
     </section>
   `;
 
-    const loginButton = container.querySelector('#auth-login-btn');
-    const errorElement = container.querySelector('#auth-gate-error');
+  const loginButton = container.querySelector('#auth-login-btn');
+  const errorElement = container.querySelector('#auth-gate-error');
 
-    if (errorMessage) {
-        errorElement.hidden = false;
-        errorElement.textContent = errorMessage;
-    }
+  if (errorMessage) {
+    errorElement.hidden = false;
+    errorElement.textContent = errorMessage;
+  }
 
-    loginButton.addEventListener('click', () => {
-        const returnTo = window.location.hash || '#songs';
-        window.location.href = buildBackendUrl(
-            `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`
-        );
-    });
+  loginButton.addEventListener('click', () => {
+    const returnTo = window.location.hash || '#songs';
+    window.location.href = buildBackendUrl(
+      `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`
+    );
+  });
 }
 
 function escapeHtml(text) {
-    const element = document.createElement('div');
-    element.textContent = text;
-    return element.innerHTML;
+  const element = document.createElement('div');
+  element.textContent = text;
+  return element.innerHTML;
 }
