@@ -1,15 +1,18 @@
 require('./load-env');
+const fs = require('fs');
 const { Pool } = require('pg');
 
-const connectionString = (process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim();
+const rawConnectionString = (process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim();
 
-if (!connectionString) {
+if (!rawConnectionString) {
     throw new Error('DATABASE_URL is required. Re:Floyd now uses Postgres for persistence.');
 }
 
+const connectionString = sanitizeConnectionString(rawConnectionString);
+
 const pool = new Pool({
     connectionString,
-    ssl: buildSslConfig(connectionString),
+    ssl: buildSslConfig(rawConnectionString),
 });
 
 pool.on('error', (err) => {
@@ -18,21 +21,47 @@ pool.on('error', (err) => {
 
 function buildSslConfig(url) {
     const sslMode = normalizeSslMode(process.env.DATABASE_SSL || process.env.PGSSLMODE);
-    const rejectUnauthorized = normalizeBoolean(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED);
+    const ca = loadCaCertificate();
+    const rejectUnauthorized = resolveRejectUnauthorized({
+        sslMode,
+        ca,
+        explicitValue: normalizeBoolean(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED),
+    });
 
     if (sslMode === false) {
         return false;
     }
 
     if (sslMode === true) {
-        return {
-            rejectUnauthorized: rejectUnauthorized ?? false,
-        };
+        return buildSslOptions(rejectUnauthorized, ca);
+    }
+
+    if (ca) {
+        return buildSslOptions(rejectUnauthorized, ca);
     }
 
     return shouldUseSslByDefault(url)
-        ? { rejectUnauthorized: rejectUnauthorized ?? false }
+        ? buildSslOptions(rejectUnauthorized, null)
         : false;
+}
+
+function buildSslOptions(rejectUnauthorized, ca) {
+    return {
+        rejectUnauthorized,
+        ...(ca ? { ca } : {}),
+    };
+}
+
+function sanitizeConnectionString(value) {
+    try {
+        const url = new URL(value);
+        ['sslmode', 'sslrootcert', 'sslcert', 'sslkey'].forEach((key) => {
+            url.searchParams.delete(key);
+        });
+        return url.toString();
+    } catch (err) {
+        return value;
+    }
 }
 
 function normalizeSslMode(value) {
@@ -67,6 +96,36 @@ function normalizeBoolean(value) {
     }
 
     return null;
+}
+
+function loadCaCertificate() {
+    const inlineCertificate = (process.env.DATABASE_SSL_CA || '').trim();
+    if (inlineCertificate) {
+        return inlineCertificate.replace(/\\n/g, '\n');
+    }
+
+    const certificatePath = (process.env.DATABASE_SSL_CA_FILE || process.env.PGSSLROOTCERT || '').trim();
+    if (!certificatePath) {
+        return null;
+    }
+
+    return fs.readFileSync(certificatePath, 'utf8');
+}
+
+function resolveRejectUnauthorized({ sslMode, ca, explicitValue }) {
+    if (explicitValue !== null) {
+        return explicitValue;
+    }
+
+    if (ca) {
+        return true;
+    }
+
+    if (sslMode === true) {
+        return false;
+    }
+
+    return false;
 }
 
 function shouldUseSslByDefault(url) {
