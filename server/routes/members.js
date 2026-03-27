@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const db = require('../db');
 const { replaceMemberMentions, syncAllCommentMentions } = require('../services/mentions');
+const { asyncHandler } = require('../utils/async-handler');
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ const storage = multer.diskStorage({
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const ext = path.extname(file.originalname);
         cb(null, `profile-${uniqueSuffix}${ext}`);
-    }
+    },
 });
 
 const upload = multer({
@@ -28,29 +29,32 @@ const upload = multer({
         const allowed = /jpeg|jpg|png|gif|webp/;
         const ext = allowed.test(path.extname(file.originalname).toLowerCase());
         const mime = allowed.test(file.mimetype);
-        if (ext && mime) return cb(null, true);
+        if (ext && mime) {
+            return cb(null, true);
+        }
         cb(new Error('Only image files are allowed'));
-    }
+    },
 });
 
 const memberSelect = `
   SELECT
     m.*,
     (
-      SELECT COUNT(*)
+      SELECT COUNT(*)::int
       FROM comment_mentions cm
-      WHERE cm.member_id = m.id AND cm.is_done = 0
+      WHERE cm.member_id = m.id AND cm.is_done = FALSE
     ) AS open_comment_count,
     (
-      SELECT COUNT(*)
+      SELECT COUNT(*)::int
       FROM comment_mentions cm
-      WHERE cm.member_id = m.id AND cm.is_done = 1
+      WHERE cm.member_id = m.id AND cm.is_done = TRUE
     ) AS done_comment_count
   FROM members m
 `;
 
-function getMemberWithCounts(memberId) {
-    return db.prepare(`${memberSelect} WHERE m.id = ?`).get(memberId);
+async function getMemberWithCounts(memberId, client = db) {
+    const result = await client.query(`${memberSelect} WHERE m.id = $1`, [memberId]);
+    return result.rows[0] || null;
 }
 
 function cleanupUploadedFile(file) {
@@ -70,30 +74,28 @@ function cleanupStoredImage(relativePath) {
     }
 }
 
-// GET /api/members — List all profiles
-router.get('/', (req, res) => {
-    const members = db.prepare(`${memberSelect} ORDER BY m.name ASC`).all();
-    res.json(members);
-});
+router.get('/', asyncHandler(async (req, res) => {
+    const members = await db.query(`${memberSelect} ORDER BY m.name ASC`);
+    res.json(members.rows);
+}));
 
-// GET /api/members/:id — Single profile
-router.get('/:id', (req, res) => {
-    const member = getMemberWithCounts(req.params.id);
+router.get('/:id', asyncHandler(async (req, res) => {
+    const member = await getMemberWithCounts(req.params.id);
     if (!member) {
         return res.status(404).json({ error: 'Profile not found' });
     }
 
     res.json(member);
-});
+}));
 
-// GET /api/members/:id/comments — Profile detail with all mentions
-router.get('/:id/comments', (req, res) => {
-    const member = getMemberWithCounts(req.params.id);
+router.get('/:id/comments', asyncHandler(async (req, res) => {
+    const member = await getMemberWithCounts(req.params.id);
     if (!member) {
         return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const comments = db.prepare(`
+    const comments = await db.query(
+        `
       SELECT
         c.id,
         c.song_id,
@@ -108,15 +110,16 @@ router.get('/:id/comments', (req, res) => {
       JOIN comments c ON c.id = cm.comment_id
       JOIN songs s ON s.id = c.song_id
       LEFT JOIN members author_member ON author_member.id = c.author_id
-      WHERE cm.member_id = ?
+      WHERE cm.member_id = $1
       ORDER BY cm.is_done ASC, c.created_at DESC
-    `).all(req.params.id);
+    `,
+        [req.params.id]
+    );
 
-    res.json({ member, comments });
-});
+    res.json({ member, comments: comments.rows });
+}));
 
-// POST /api/members — Add a new profile
-router.post('/', upload.single('avatar'), (req, res) => {
+router.post('/', upload.single('avatar'), asyncHandler(async (req, res) => {
     const { name } = req.body;
     const nextName = name?.trim();
 
@@ -125,23 +128,28 @@ router.post('/', upload.single('avatar'), (req, res) => {
         return res.status(400).json({ error: 'Profile name is required' });
     }
 
-    const existing = db.prepare('SELECT id FROM members WHERE lower(name) = lower(?)').get(nextName);
-    if (existing) {
+    const existing = await db.query('SELECT id FROM members WHERE lower(name) = lower($1)', [nextName]);
+    if (existing.rows[0]) {
         cleanupUploadedFile(req.file);
         return res.status(409).json({ error: 'A profile with this name already exists' });
     }
 
     const avatarImage = req.file ? `/uploads/${req.file.filename}` : null;
-    const result = db.prepare('INSERT INTO members (name, avatar_image) VALUES (?, ?)').run(nextName, avatarImage);
-    syncAllCommentMentions();
+    const result = await db.query(
+        'INSERT INTO members (name, avatar_image) VALUES ($1, $2) RETURNING id',
+        [nextName, avatarImage]
+    );
 
-    const member = getMemberWithCounts(result.lastInsertRowid);
+    await syncAllCommentMentions();
+
+    const member = await getMemberWithCounts(result.rows[0].id);
     res.status(201).json(member);
-});
+}));
 
-// PATCH /api/members/:id — Update profile information
-router.patch('/:id', upload.single('avatar'), (req, res) => {
-    const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
+router.patch('/:id', upload.single('avatar'), asyncHandler(async (req, res) => {
+    const memberResult = await db.query('SELECT * FROM members WHERE id = $1', [req.params.id]);
+    const member = memberResult.rows[0];
+
     if (!member) {
         cleanupUploadedFile(req.file);
         return res.status(404).json({ error: 'Profile not found' });
@@ -155,49 +163,54 @@ router.patch('/:id', upload.single('avatar'), (req, res) => {
         return res.status(400).json({ error: 'Profile name is required' });
     }
 
-    const duplicate = db.prepare(
-        'SELECT id FROM members WHERE lower(name) = lower(?) AND id != ?'
-    ).get(nextName, req.params.id);
-
-    if (duplicate) {
+    const duplicate = await db.query(
+        'SELECT id FROM members WHERE lower(name) = lower($1) AND id != $2',
+        [nextName, req.params.id]
+    );
+    if (duplicate.rows[0]) {
         cleanupUploadedFile(req.file);
         return res.status(409).json({ error: 'A profile with this name already exists' });
     }
 
     const avatarImage = req.file ? `/uploads/${req.file.filename}` : member.avatar_image;
-    db.prepare('UPDATE members SET name = ?, avatar_image = ? WHERE id = ?').run(
-        nextName,
-        avatarImage,
-        req.params.id
-    );
+
+    await db.withTransaction(async (client) => {
+        await client.query(
+            'UPDATE members SET name = $1, avatar_image = $2 WHERE id = $3',
+            [nextName, avatarImage, req.params.id]
+        );
+
+        if (nextName !== member.name) {
+            await client.query(
+                `
+                  UPDATE comments
+                  SET author = $1
+                  WHERE author_id = $2 OR (author_id IS NULL AND lower(author) = lower($3))
+                `,
+                [nextName, req.params.id, member.name]
+            );
+            await replaceMemberMentions(member.name, nextName, client);
+            await syncAllCommentMentions(client);
+        }
+    });
 
     if (req.file && member.avatar_image && member.avatar_image !== avatarImage) {
         cleanupStoredImage(member.avatar_image);
     }
 
-    if (nextName !== member.name) {
-        db.prepare(`
-          UPDATE comments
-          SET author = ?
-          WHERE author_id = ? OR (author_id IS NULL AND lower(author) = lower(?))
-        `).run(nextName, req.params.id, member.name);
-        replaceMemberMentions(member.name, nextName);
-        syncAllCommentMentions();
-    }
+    res.json(await getMemberWithCounts(req.params.id));
+}));
 
-    res.json(getMemberWithCounts(req.params.id));
-});
-
-// DELETE /api/members/:id — Remove a profile
-router.delete('/:id', (req, res) => {
-    const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
+router.delete('/:id', asyncHandler(async (req, res) => {
+    const memberResult = await db.query('SELECT * FROM members WHERE id = $1', [req.params.id]);
+    const member = memberResult.rows[0];
     if (!member) {
         return res.status(404).json({ error: 'Profile not found' });
     }
 
     cleanupStoredImage(member.avatar_image);
-    db.prepare('DELETE FROM members WHERE id = ?').run(req.params.id);
+    await db.query('DELETE FROM members WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-});
+}));
 
 module.exports = router;

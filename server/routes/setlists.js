@@ -1,18 +1,8 @@
 const express = require('express');
 const db = require('../db');
+const { asyncHandler } = require('../utils/async-handler');
 
 const router = express.Router();
-
-const createSetlistStatement = db.prepare(
-    'INSERT INTO setlists (name, updated_at) VALUES (?, datetime(\'now\'))'
-);
-const updateSetlistStatement = db.prepare(
-    'UPDATE setlists SET name = ?, updated_at = datetime(\'now\') WHERE id = ?'
-);
-const deleteSetlistSongsStatement = db.prepare('DELETE FROM setlist_songs WHERE setlist_id = ?');
-const insertSetlistSongStatement = db.prepare(
-    'INSERT INTO setlist_songs (setlist_id, song_id, position) VALUES (?, ?, ?)'
-);
 
 function parseSongIds(value) {
     if (!Array.isArray(value) || value.length === 0) {
@@ -27,19 +17,23 @@ function parseSongIds(value) {
     return songIds;
 }
 
-function validateSongIds(songIds) {
+async function validateSongIds(songIds) {
     if (!songIds?.length) {
         return false;
     }
 
     const uniqueSongIds = [...new Set(songIds)];
-    const placeholders = uniqueSongIds.map(() => '?').join(', ');
-    const existingSongs = db.prepare(`SELECT id FROM songs WHERE id IN (${placeholders})`).all(...uniqueSongIds);
-    return existingSongs.length === uniqueSongIds.length;
+    const existingSongs = await db.query(
+        'SELECT id FROM songs WHERE id = ANY($1::int[])',
+        [uniqueSongIds]
+    );
+
+    return existingSongs.rows.length === uniqueSongIds.length;
 }
 
-function getSetlistSummaryRows() {
-    return db.prepare(`
+async function getSetlistSummaryRows() {
+    const result = await db.query(
+        `
         SELECT
             sl.id,
             sl.name,
@@ -52,7 +46,10 @@ function getSetlistSummaryRows() {
         LEFT JOIN setlist_songs ss ON ss.setlist_id = sl.id
         LEFT JOIN songs s ON s.id = ss.song_id
         ORDER BY sl.updated_at DESC, sl.id DESC, ss.position ASC
-    `).all();
+    `
+    );
+
+    return result.rows;
 }
 
 function buildSetlistSummaries(rows) {
@@ -88,13 +85,15 @@ function buildSetlistSummaries(rows) {
     return summaries;
 }
 
-function getSetlistById(setlistId) {
-    const setlist = db.prepare('SELECT * FROM setlists WHERE id = ?').get(setlistId);
+async function getSetlistById(setlistId, client = db) {
+    const setlistResult = await client.query('SELECT * FROM setlists WHERE id = $1', [setlistId]);
+    const setlist = setlistResult.rows[0];
     if (!setlist) {
         return null;
     }
 
-    const songs = db.prepare(`
+    const songsResult = await client.query(
+        `
         SELECT
             ss.id AS entry_id,
             ss.position,
@@ -104,55 +103,67 @@ function getSetlistById(setlistId) {
             s.rehearsal_count
         FROM setlist_songs ss
         INNER JOIN songs s ON s.id = ss.song_id
-        WHERE ss.setlist_id = ?
+        WHERE ss.setlist_id = $1
         ORDER BY ss.position ASC
-    `).all(setlistId);
+    `,
+        [setlistId]
+    );
 
     return {
         ...setlist,
-        song_count: songs.length,
-        songs,
+        song_count: songsResult.rows.length,
+        songs: songsResult.rows,
     };
 }
 
-function replaceSetlistSongs(setlistId, songIds) {
-    deleteSetlistSongsStatement.run(setlistId);
-    songIds.forEach((songId, index) => {
-        insertSetlistSongStatement.run(setlistId, songId, index + 1);
+async function replaceSetlistSongs(client, setlistId, songIds) {
+    await client.query('DELETE FROM setlist_songs WHERE setlist_id = $1', [setlistId]);
+
+    for (const [index, songId] of songIds.entries()) {
+        await client.query(
+            'INSERT INTO setlist_songs (setlist_id, song_id, position) VALUES ($1, $2, $3)',
+            [setlistId, songId, index + 1]
+        );
+    }
+}
+
+async function createSetlist(name, songIds) {
+    return db.withTransaction(async (client) => {
+        const result = await client.query(
+            'INSERT INTO setlists (name) VALUES ($1) RETURNING id',
+            [name]
+        );
+        const setlistId = result.rows[0].id;
+        await replaceSetlistSongs(client, setlistId, songIds);
+        return setlistId;
     });
 }
 
-const createSetlist = db.transaction((name, songIds) => {
-    const result = createSetlistStatement.run(name);
-    songIds.forEach((songId, index) => {
-        insertSetlistSongStatement.run(result.lastInsertRowid, songId, index + 1);
+async function updateSetlist(setlistId, name, songIds) {
+    return db.withTransaction(async (client) => {
+        await client.query(
+            'UPDATE setlists SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [name, setlistId]
+        );
+        await replaceSetlistSongs(client, setlistId, songIds);
     });
-    return result.lastInsertRowid;
-});
+}
 
-const updateSetlist = db.transaction((setlistId, name, songIds) => {
-    updateSetlistStatement.run(name, setlistId);
-    replaceSetlistSongs(setlistId, songIds);
-});
-
-// GET /api/setlists — List setlists
-router.get('/', (req, res) => {
-    const summaries = buildSetlistSummaries(getSetlistSummaryRows());
+router.get('/', asyncHandler(async (req, res) => {
+    const summaries = buildSetlistSummaries(await getSetlistSummaryRows());
     res.json(summaries);
-});
+}));
 
-// GET /api/setlists/:id — Get one setlist with ordered songs
-router.get('/:id', (req, res) => {
-    const setlist = getSetlistById(req.params.id);
+router.get('/:id', asyncHandler(async (req, res) => {
+    const setlist = await getSetlistById(req.params.id);
     if (!setlist) {
         return res.status(404).json({ error: 'Setlist not found' });
     }
 
     res.json(setlist);
-});
+}));
 
-// POST /api/setlists — Create a setlist
-router.post('/', (req, res) => {
+router.post('/', asyncHandler(async (req, res) => {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const songIds = parseSongIds(req.body?.songIds);
 
@@ -164,19 +175,18 @@ router.post('/', (req, res) => {
         return res.status(400).json({ error: 'Setlists need at least one song' });
     }
 
-    if (!validateSongIds(songIds)) {
+    if (!await validateSongIds(songIds)) {
         return res.status(400).json({ error: 'One or more songs could not be found' });
     }
 
-    const setlistId = createSetlist(name, songIds);
-    const setlist = getSetlistById(setlistId);
+    const setlistId = await createSetlist(name, songIds);
+    const setlist = await getSetlistById(setlistId);
     res.status(201).json(setlist);
-});
+}));
 
-// PATCH /api/setlists/:id — Update a setlist and replace its ordered songs
-router.patch('/:id', (req, res) => {
-    const existingSetlist = db.prepare('SELECT id FROM setlists WHERE id = ?').get(req.params.id);
-    if (!existingSetlist) {
+router.patch('/:id', asyncHandler(async (req, res) => {
+    const existingSetlist = await db.query('SELECT id FROM setlists WHERE id = $1', [req.params.id]);
+    if (!existingSetlist.rows[0]) {
         return res.status(404).json({ error: 'Setlist not found' });
     }
 
@@ -191,25 +201,23 @@ router.patch('/:id', (req, res) => {
         return res.status(400).json({ error: 'Setlists need at least one song' });
     }
 
-    if (!validateSongIds(songIds)) {
+    if (!await validateSongIds(songIds)) {
         return res.status(400).json({ error: 'One or more songs could not be found' });
     }
 
-    updateSetlist(req.params.id, name, songIds);
-
-    const updatedSetlist = getSetlistById(req.params.id);
+    await updateSetlist(req.params.id, name, songIds);
+    const updatedSetlist = await getSetlistById(req.params.id);
     res.json(updatedSetlist);
-});
+}));
 
-// DELETE /api/setlists/:id — Delete a setlist
-router.delete('/:id', (req, res) => {
-    const setlist = db.prepare('SELECT id FROM setlists WHERE id = ?').get(req.params.id);
-    if (!setlist) {
+router.delete('/:id', asyncHandler(async (req, res) => {
+    const setlist = await db.query('SELECT id FROM setlists WHERE id = $1', [req.params.id]);
+    if (!setlist.rows[0]) {
         return res.status(404).json({ error: 'Setlist not found' });
     }
 
-    db.prepare('DELETE FROM setlists WHERE id = ?').run(req.params.id);
+    await db.query('DELETE FROM setlists WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-});
+}));
 
 module.exports = router;

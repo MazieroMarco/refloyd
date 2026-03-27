@@ -3,10 +3,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
+const { asyncHandler } = require('../utils/async-handler');
 
 const router = express.Router();
 
-// Configure multer for cover image uploads
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -18,23 +18,29 @@ const storage = multer.diskStorage({
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const ext = path.extname(file.originalname);
         cb(null, `cover-${uniqueSuffix}${ext}`);
-    }
+    },
 });
 
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowed = /jpeg|jpg|png|gif|webp/;
         const ext = allowed.test(path.extname(file.originalname).toLowerCase());
         const mime = allowed.test(file.mimetype);
-        if (ext && mime) return cb(null, true);
+        if (ext && mime) {
+            return cb(null, true);
+        }
         cb(new Error('Only image files are allowed'));
-    }
+    },
 });
 
-// GET /api/songs — List all songs
-router.get('/', (req, res) => {
+async function getSongById(songId) {
+    const result = await db.query('SELECT * FROM songs WHERE id = $1', [songId]);
+    return result.rows[0] || null;
+}
+
+router.get('/', asyncHandler(async (req, res) => {
     const sortOrder = {
         newest: 's.created_at DESC, s.id DESC',
         'least-rehearsed': 's.rehearsal_count ASC, LOWER(s.name) ASC, s.id ASC',
@@ -42,42 +48,49 @@ router.get('/', (req, res) => {
         name: 'LOWER(s.name) ASC, s.id ASC',
     };
     const selectedSort = sortOrder[req.query.sort] ? req.query.sort : 'newest';
-    const songs = db.prepare(`
-    SELECT s.*, 
-      (SELECT COUNT(*) FROM comments c WHERE c.song_id = s.id) as comment_count
-    FROM songs s 
-    ORDER BY ${sortOrder[selectedSort]}
-  `).all();
-    res.json(songs);
-});
 
-// GET /api/songs/:id — Get a single song
-router.get('/:id', (req, res) => {
-    const song = db.prepare('SELECT * FROM songs WHERE id = ?').get(req.params.id);
-    if (!song) return res.status(404).json({ error: 'Song not found' });
+    const songs = await db.query(
+        `
+      SELECT
+        s.*,
+        (SELECT COUNT(*)::int FROM comments c WHERE c.song_id = s.id) AS comment_count
+      FROM songs s
+      ORDER BY ${sortOrder[selectedSort]}
+    `
+    );
+
+    res.json(songs.rows);
+}));
+
+router.get('/:id', asyncHandler(async (req, res) => {
+    const song = await getSongById(req.params.id);
+    if (!song) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
+
     res.json(song);
-});
+}));
 
-// POST /api/songs — Add a new song
-router.post('/', upload.single('cover'), (req, res) => {
+router.post('/', upload.single('cover'), asyncHandler(async (req, res) => {
     const { name } = req.body;
     if (!name || !name.trim()) {
         return res.status(400).json({ error: 'Song name is required' });
     }
 
     const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
+    const result = await db.query(
+        'INSERT INTO songs (name, cover_image) VALUES ($1, $2) RETURNING *',
+        [name.trim(), coverImage]
+    );
 
-    const result = db.prepare(
-        'INSERT INTO songs (name, cover_image) VALUES (?, ?)'
-    ).run(name.trim(), coverImage);
+    res.status(201).json(result.rows[0]);
+}));
 
-    const song = db.prepare('SELECT * FROM songs WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(song);
-});
-
-function updateRehearsalCount(req, res) {
-    const song = db.prepare('SELECT * FROM songs WHERE id = ?').get(req.params.id);
-    if (!song) return res.status(404).json({ error: 'Song not found' });
+async function updateRehearsalCount(req, res) {
+    const song = await getSongById(req.params.id);
+    if (!song) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
 
     const rawDelta = req.body?.delta;
     const delta = rawDelta === undefined ? 1 : Number.parseInt(rawDelta, 10);
@@ -87,25 +100,23 @@ function updateRehearsalCount(req, res) {
     }
 
     const nextCount = Math.max(0, song.rehearsal_count + delta);
+    const updated = await db.query(
+        'UPDATE songs SET rehearsal_count = $1 WHERE id = $2 RETURNING *',
+        [nextCount, req.params.id]
+    );
 
-    db.prepare('UPDATE songs SET rehearsal_count = ? WHERE id = ?').run(nextCount, req.params.id);
-
-    const updated = db.prepare('SELECT * FROM songs WHERE id = ?').get(req.params.id);
-    res.json(updated);
+    res.json(updated.rows[0]);
 }
 
-// PATCH /api/songs/:id/rehearse — Adjust rehearsal count
-router.patch('/:id/rehearse', updateRehearsalCount);
+router.patch('/:id/rehearse', asyncHandler(updateRehearsalCount));
+router.patch('/:id/rehearsal-count', asyncHandler(updateRehearsalCount));
 
-// PATCH /api/songs/:id/rehearsal-count — Adjust rehearsal count
-router.patch('/:id/rehearsal-count', updateRehearsalCount);
+router.delete('/:id', asyncHandler(async (req, res) => {
+    const song = await getSongById(req.params.id);
+    if (!song) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
 
-// DELETE /api/songs/:id — Delete a song
-router.delete('/:id', (req, res) => {
-    const song = db.prepare('SELECT * FROM songs WHERE id = ?').get(req.params.id);
-    if (!song) return res.status(404).json({ error: 'Song not found' });
-
-    // Delete cover image file if it exists
     if (song.cover_image) {
         const filePath = path.join(__dirname, '..', song.cover_image);
         if (fs.existsSync(filePath)) {
@@ -113,8 +124,8 @@ router.delete('/:id', (req, res) => {
         }
     }
 
-    db.prepare('DELETE FROM songs WHERE id = ?').run(req.params.id);
+    await db.query('DELETE FROM songs WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-});
+}));
 
 module.exports = router;

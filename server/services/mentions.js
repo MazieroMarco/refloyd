@@ -1,14 +1,5 @@
 const db = require('../db');
 
-const getAllMembers = db.prepare('SELECT id, name FROM members ORDER BY id ASC');
-const getAllComments = db.prepare('SELECT id, author, author_id, text FROM comments ORDER BY id ASC');
-const getCommentById = db.prepare('SELECT id, author, author_id, text FROM comments WHERE id = ?');
-const getCommentMentionRows = db.prepare('SELECT member_id FROM comment_mentions WHERE comment_id = ?');
-const insertCommentMention = db.prepare('INSERT INTO comment_mentions (comment_id, member_id) VALUES (?, ?)');
-const deleteCommentMention = db.prepare('DELETE FROM comment_mentions WHERE comment_id = ? AND member_id = ?');
-const setCommentAuthorId = db.prepare('UPDATE comments SET author_id = ? WHERE id = ?');
-const updateCommentText = db.prepare('UPDATE comments SET text = ? WHERE id = ?');
-
 function escapeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -21,66 +12,106 @@ function commentMentionsMember(text, memberName) {
     return buildMentionRegex(memberName).test(text);
 }
 
-function syncCommentMentionsInternal(comment, members) {
-    const existingMemberIds = new Set(
-        getCommentMentionRows.all(comment.id).map((row) => row.member_id)
-    );
+async function getAllMembers(client) {
+    const result = await client.query('SELECT id, name FROM members ORDER BY id ASC');
+    return result.rows;
+}
 
+async function getAllComments(client) {
+    const result = await client.query('SELECT id, author, author_id, text FROM comments ORDER BY id ASC');
+    return result.rows;
+}
+
+async function getCommentById(client, commentId) {
+    const result = await client.query(
+        'SELECT id, author, author_id, text FROM comments WHERE id = $1',
+        [commentId]
+    );
+    return result.rows[0] || null;
+}
+
+async function syncCommentMentionsInternal(client, comment, members) {
+    const mentionRows = await client.query(
+        'SELECT member_id FROM comment_mentions WHERE comment_id = $1',
+        [comment.id]
+    );
+    const existingMemberIds = new Set(mentionRows.rows.map((row) => row.member_id));
     const mentionedMemberIds = new Set();
+
     for (const member of members) {
         if (commentMentionsMember(comment.text, member.name)) {
             mentionedMemberIds.add(member.id);
         }
 
         if (!comment.author_id && comment.author && comment.author.toLowerCase() === member.name.toLowerCase()) {
-            setCommentAuthorId.run(member.id, comment.id);
+            await client.query('UPDATE comments SET author_id = $1 WHERE id = $2', [member.id, comment.id]);
             comment.author_id = member.id;
         }
     }
 
     for (const memberId of existingMemberIds) {
         if (!mentionedMemberIds.has(memberId)) {
-            deleteCommentMention.run(comment.id, memberId);
+            await client.query(
+                'DELETE FROM comment_mentions WHERE comment_id = $1 AND member_id = $2',
+                [comment.id, memberId]
+            );
         }
     }
 
     for (const memberId of mentionedMemberIds) {
         if (!existingMemberIds.has(memberId)) {
-            insertCommentMention.run(comment.id, memberId);
+            await client.query(
+                'INSERT INTO comment_mentions (comment_id, member_id) VALUES ($1, $2)',
+                [comment.id, memberId]
+            );
         }
     }
 }
 
-const syncAllCommentMentions = db.transaction(() => {
-    const members = getAllMembers.all();
-    const comments = getAllComments.all();
-
-    for (const comment of comments) {
-        syncCommentMentionsInternal(comment, members);
-    }
-});
-
-const syncCommentMentionsForComment = db.transaction((commentId) => {
-    const comment = getCommentById.get(commentId);
-    if (!comment) {
-        return;
+async function runWithTransaction(client, callback) {
+    if (client) {
+        return callback(client);
     }
 
-    const members = getAllMembers.all();
-    syncCommentMentionsInternal(comment, members);
-});
+    return db.withTransaction(callback);
+}
 
-const replaceMemberMentions = db.transaction((oldName, newName) => {
-    const comments = getAllComments.all();
-    const mentionRegex = buildMentionRegex(oldName, 'gi');
+async function syncAllCommentMentions(client = null) {
+    return runWithTransaction(client, async (tx) => {
+        const members = await getAllMembers(tx);
+        const comments = await getAllComments(tx);
 
-    for (const comment of comments) {
-        const updatedText = comment.text.replace(mentionRegex, (_, prefix) => `${prefix}@${newName}`);
-        if (updatedText !== comment.text) {
-            updateCommentText.run(updatedText, comment.id);
+        for (const comment of comments) {
+            await syncCommentMentionsInternal(tx, comment, members);
         }
-    }
-});
+    });
+}
+
+async function syncCommentMentionsForComment(commentId, client = null) {
+    return runWithTransaction(client, async (tx) => {
+        const comment = await getCommentById(tx, commentId);
+        if (!comment) {
+            return;
+        }
+
+        const members = await getAllMembers(tx);
+        await syncCommentMentionsInternal(tx, comment, members);
+    });
+}
+
+async function replaceMemberMentions(oldName, newName, client = null) {
+    return runWithTransaction(client, async (tx) => {
+        const comments = await getAllComments(tx);
+        const mentionRegex = buildMentionRegex(oldName, 'gi');
+
+        for (const comment of comments) {
+            const updatedText = comment.text.replace(mentionRegex, (_, prefix) => `${prefix}@${newName}`);
+            if (updatedText !== comment.text) {
+                await tx.query('UPDATE comments SET text = $1 WHERE id = $2', [updatedText, comment.id]);
+            }
+        }
+    });
+}
 
 module.exports = {
     replaceMemberMentions,
