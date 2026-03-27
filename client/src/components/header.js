@@ -1,17 +1,33 @@
 import { navigate } from '../main.js';
+import { buildBackendUrl } from '../config.js';
 
-export function renderHeader(activePage, { currentProfile } = {}) {
+export function renderHeader(activePage, { authSession, currentProfile } = {}) {
     const wrapper = document.createElement('div');
     wrapper.className = 'app-topbar';
+    const authLabel = getAuthLabel(authSession);
 
     if (!currentProfile) {
         wrapper.innerHTML = `
       <header class="app-header app-header-simple">
         <button class="app-logo plain-button" id="logo">Re:Floyd</button>
       </header>
+      ${authSession?.authenticated ? `
+        <div class="identity-bar identity-bar-auth-only">
+          <div class="identity-access">
+            <span class="identity-label">Access</span>
+            <span class="identity-auth-user">${escapeHtml(authLabel)}</span>
+          </div>
+          <div class="identity-actions">
+            <button class="identity-switch-btn" id="logout-btn">Sign out</button>
+          </div>
+        </div>
+      ` : ''}
     `;
 
-        wrapper.querySelector('#logo').addEventListener('click', () => navigate('choose-profile'));
+        wrapper.querySelector('#logo').addEventListener('click', () => {
+            navigate(authSession?.authenticated ? 'choose-profile' : '');
+        });
+        bindLogout(wrapper);
         return wrapper;
     }
 
@@ -29,9 +45,14 @@ export function renderHeader(activePage, { currentProfile } = {}) {
         <span class="identity-label">Current profile</span>
         <button class="identity-profile-link" id="current-profile-link">${escapeHtml(currentProfile.name)}</button>
       </div>
+      <div class="identity-access">
+        <span class="identity-label">Access</span>
+        <span class="identity-auth-user">${escapeHtml(authLabel)}</span>
+      </div>
       <div class="identity-actions">
         <span class="identity-pill">${currentProfile.open_comment_count || 0} open notes</span>
         <button class="identity-switch-btn" id="switch-profile-btn">Switch profile</button>
+        <button class="identity-switch-btn" id="logout-btn">Sign out</button>
       </div>
     </div>
   `;
@@ -55,7 +76,33 @@ export function renderHeader(activePage, { currentProfile } = {}) {
         navigate('choose-profile');
     });
 
+    bindLogout(wrapper);
+
     return wrapper;
+}
+
+function bindLogout(wrapper) {
+    const logoutButton = wrapper.querySelector('#logout-btn');
+    if (!logoutButton) {
+        return;
+    }
+
+    logoutButton.addEventListener('click', () => {
+        window.location.href = buildBackendUrl(
+            `/api/auth/logout?returnTo=${encodeURIComponent(window.location.hash || '')}`
+        );
+    });
+}
+
+function getAuthLabel(authSession) {
+    if (!authSession?.authenticated) {
+        return 'Signed out';
+    }
+
+    return authSession.user?.displayName
+        || authSession.user?.email
+        || authSession.user?.preferredUsername
+        || 'Signed in';
 }
 
 function escapeHtml(text) {

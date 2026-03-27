@@ -29,6 +29,13 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
+    if (url.pathname === '/app-config.js') {
+        event.respondWith(
+            fetch(request).catch(() => caches.match(request))
+        );
+        return;
+    }
+
     // API calls: network-first
     if (url.pathname.startsWith('/api') || url.pathname.startsWith('/uploads')) {
         event.respondWith(

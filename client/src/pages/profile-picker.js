@@ -10,7 +10,7 @@ export async function renderProfilePicker(container, params, context = {}) {
       <div class="profile-picker-hero">
         <span class="profile-picker-kicker">Re:Floyd</span>
         <h1>Choose a profile</h1>
-        <p>Pick who you are before you start logging rehearsals or posting notes.</p>
+        <p>Pick which band profile you want to use. This stays separate from the account you used to sign in.</p>
       </div>
       <div class="profile-picker-grid" id="profile-picker-grid"></div>
       <form class="add-member-form profile-picker-form" id="create-profile-form">

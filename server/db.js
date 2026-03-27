@@ -60,6 +60,15 @@ db.exec(`
     FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS auth_sessions (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    user_json TEXT NOT NULL,
+    id_token TEXT,
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function hasColumn(tableName, columnName) {
@@ -79,6 +88,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_comment_mentions_member_done ON comment_mentions(member_id, is_done);
   CREATE INDEX IF NOT EXISTS idx_setlist_songs_setlist_position ON setlist_songs(setlist_id, position);
   CREATE INDEX IF NOT EXISTS idx_setlist_songs_song_id ON setlist_songs(song_id);
+  CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at);
 `);
 
 // Seed default members if table is empty

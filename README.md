@@ -11,6 +11,7 @@ The project is split into a small vanilla JavaScript frontend and an Express + S
 - Leave song-specific improvement notes
 - Mention profiles inside comments with `@Profile Name`
 - Force profile selection before using the app
+- Optional OIDC access control before entering the app
 - Open a dedicated profile detail page to see all mentions
 - Mark mentioned notes as `DONE` per profile
 - Rename, add, switch, and delete profiles
@@ -83,6 +84,46 @@ http://localhost:5173
 
 The Vite dev server proxies `/api` and `/uploads` to the backend on `http://localhost:3001`.
 
+For production, the frontend also loads a separate runtime config file at `client/public/app-config.js`. You can point the built app at a different backend URL there without rebuilding the JavaScript bundle.
+
+## OIDC Access Control
+
+Re:Floyd can require OIDC sign-in before someone can access the app. That sign-in is only used as an access gate. After login, the person still chooses any in-app profile exactly like before.
+
+OIDC stays disabled until you configure it. Once enabled, the backend protects `/api` and `/uploads`, and the frontend shows a login screen until the browser has a valid session.
+
+The backend now loads `server/.env` automatically on startup. A root `.env` also works as a fallback, but `server/.env` is the intended location for the backend settings.
+
+If your frontend and backend are hosted on different public origins in production, also set `BACKEND_ORIGIN` on the server and `backendUrl` in `client/public/app-config.js`.
+
+### Required server environment
+
+- `APP_ORIGIN` — the public browser origin for the app. In local development this should be `http://localhost:5173`
+- `BACKEND_ORIGIN` — optional public origin for the backend when it is hosted separately from the frontend
+- `OIDC_ISSUER_URL` or `OIDC_DISCOVERY_URL` — your provider issuer or full discovery URL
+- `OIDC_CLIENT_ID` — the OIDC client ID registered for Re:Floyd
+
+### Optional server environment
+
+- `OIDC_ENABLED=true` — force-enable OIDC even if some values are injected later by your runtime
+- `OIDC_CLIENT_SECRET` — required for confidential clients
+- `OIDC_CLIENT_AUTH_METHOD` — `client_secret_basic`, `client_secret_post`, or `none`
+- `OIDC_SCOPE` — defaults to `openid profile email`
+- `OIDC_PROVIDER_NAME` — label shown in the login UI
+- `OIDC_SESSION_TTL_HOURS` — local session lifetime, defaults to `12`
+- `OIDC_SESSION_COOKIE_SAME_SITE` — cookie SameSite policy, defaults to `Lax`
+- `OIDC_AUTHORIZATION_EXTRA_PARAMS` — extra auth request params as a query string, for example `prompt=login&audience=https%3A%2F%2Fapi.example.com`
+
+### Local development callback
+
+Register this callback URL with your identity provider:
+
+```text
+http://localhost:5173/api/auth/callback
+```
+
+That path is handled by the Express backend through the Vite dev proxy, which keeps the session cookie on the frontend origin during local development.
+
 ## Available Scripts
 
 ### Frontend (`client/`)
@@ -125,7 +166,9 @@ Songs can have:
 
 ### Profiles
 
-Profiles represent band members or users of the app. A profile must be selected before using the UI.
+Profiles represent band members or personas inside the app. A profile must be selected before using the UI.
+
+These profiles are intentionally separate from OIDC identities. Authentication only decides who may enter Re:Floyd; it does not map a signed-in account to a specific profile.
 
 Each profile can:
 
