@@ -1,0 +1,57 @@
+name: Deploy Server to Firebase
+
+on:
+  push:
+    branches:
+      - main
+      - f/firebase-integration
+    paths:
+      - server/**
+      - firebase.json
+      - .github/workflows/deploy-server-firebase.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Write server environment file
+        env:
+          FIREBASE_SERVER_ENV: ${{ secrets.FIREBASE_SERVER_ENV }}
+        run: |
+          if [ -z "$FIREBASE_SERVER_ENV" ]; then
+            echo "Missing FIREBASE_SERVER_ENV secret" >&2
+            exit 1
+          fi
+
+          printf '%s\n' "$FIREBASE_SERVER_ENV" > server/.env
+
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Cloud Function
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+        run: npx --yes firebase-tools deploy --project "$FIREBASE_PROJECT_ID" --only functions --non-interactive

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend for ReFloyd rehearsal tracker",
   "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
@@ -12,6 +15,8 @@
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.16.3"
   },

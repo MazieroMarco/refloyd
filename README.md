@@ -161,6 +161,37 @@ That path is handled by the Express backend through the Vite dev proxy, which ke
 - `npm start` starts the Express API with Node
 - `npm run migrate:sqlite` copies data from `server/data.db` into an empty Postgres database
 
+## Firebase Deployment
+
+This repository now includes separate GitHub Actions workflows for Firebase Hosting and Firebase Functions:
+
+- `.github/workflows/deploy-client-firebase.yml` builds `client/` and deploys the static app to Firebase Hosting
+- `.github/workflows/deploy-server-firebase.yml` deploys `server/` as a single HTTPS Cloud Function named `api`
+
+The root `firebase.json` also rewrites `/api/**` and `/uploads/**` from Hosting to that `api` function, so the browser can keep using same-origin requests in production.
+
+The sample setup uses Firebase's default Functions region, `us-central1`. If you want a different region, update both `server/index.js` and `firebase.json` to keep the function and Hosting rewrites aligned.
+
+### GitHub secrets required
+
+- `FIREBASE_PROJECT_ID` — your Firebase project ID
+- `FIREBASE_SERVICE_ACCOUNT` — a service account JSON key with permission to deploy Hosting and Functions
+- `FIREBASE_SERVER_ENV` — the full contents of the server `.env` file as a multiline secret
+
+`FIREBASE_SERVER_ENV` should contain the same keys described in `server/.env.example`. For Firebase Hosting on the default domain, `APP_ORIGIN` should usually be your Hosting URL, for example `https://your-project-id.web.app`.
+
+Because Hosting rewrites `/api` to the same Firebase project, `BACKEND_ORIGIN` can usually match `APP_ORIGIN` in this setup.
+
+### Deploy behavior
+
+- pushes to `main` that touch `client/**` trigger the client deploy workflow
+- pushes to `main` that touch `server/**` trigger the server deploy workflow
+- either workflow can also be run manually with `workflow_dispatch`
+
+### Important upload caveat
+
+The server now uses a writable temp directory automatically when it runs on Firebase-managed runtimes. This makes the API boot correctly on Firebase Functions, but uploaded files are still not durable there. For production-grade uploads, move song/profile images to Cloud Storage before relying on Firebase Functions long term.
+
 ## Data and Storage
 
 Re:Floyd stores its application data in Postgres. Uploaded song and profile images still live on the server filesystem in:

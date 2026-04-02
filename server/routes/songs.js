@@ -4,13 +4,15 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const { asyncHandler } = require('../utils/async-handler');
+const {
+    buildUploadUrl,
+    ensureUploadsDir,
+    resolveStoredUploadPath,
+} = require('../utils/uploads');
 
 const router = express.Router();
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const uploadsDir = ensureUploadsDir();
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -77,7 +79,7 @@ router.post('/', upload.single('cover'), asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Song name is required' });
     }
 
-    const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
+    const coverImage = req.file ? buildUploadUrl(req.file.filename) : null;
     const result = await db.query(
         'INSERT INTO songs (name, cover_image) VALUES ($1, $2) RETURNING *',
         [name.trim(), coverImage]
@@ -118,7 +120,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     }
 
     if (song.cover_image) {
-        const filePath = path.join(__dirname, '..', song.cover_image);
+        const filePath = resolveStoredUploadPath(song.cover_image);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }

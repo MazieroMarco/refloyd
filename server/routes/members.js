@@ -5,13 +5,15 @@ const path = require('path');
 const db = require('../db');
 const { replaceMemberMentions, syncAllCommentMentions } = require('../services/mentions');
 const { asyncHandler } = require('../utils/async-handler');
+const {
+    buildUploadUrl,
+    ensureUploadsDir,
+    resolveStoredUploadPath,
+} = require('../utils/uploads');
 
 const router = express.Router();
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const uploadsDir = ensureUploadsDir();
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -68,7 +70,7 @@ function cleanupStoredImage(relativePath) {
         return;
     }
 
-    const filePath = path.join(__dirname, '..', relativePath);
+    const filePath = resolveStoredUploadPath(relativePath);
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
     }
@@ -134,7 +136,7 @@ router.post('/', upload.single('avatar'), asyncHandler(async (req, res) => {
         return res.status(409).json({ error: 'A profile with this name already exists' });
     }
 
-    const avatarImage = req.file ? `/uploads/${req.file.filename}` : null;
+    const avatarImage = req.file ? buildUploadUrl(req.file.filename) : null;
     const result = await db.query(
         'INSERT INTO members (name, avatar_image) VALUES ($1, $2) RETURNING id',
         [nextName, avatarImage]
@@ -172,7 +174,7 @@ router.patch('/:id', upload.single('avatar'), asyncHandler(async (req, res) => {
         return res.status(409).json({ error: 'A profile with this name already exists' });
     }
 
-    const avatarImage = req.file ? `/uploads/${req.file.filename}` : member.avatar_image;
+    const avatarImage = req.file ? buildUploadUrl(req.file.filename) : member.avatar_image;
 
     await db.withTransaction(async (client) => {
         await client.query(

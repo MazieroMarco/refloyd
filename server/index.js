@@ -1,14 +1,19 @@
 require('./load-env');
 const cors = require('cors');
 const express = require('express');
-const path = require('path');
+const { onRequest } = require('firebase-functions/v2/https');
 const { initDatabase } = require('./db');
 const { syncAllCommentMentions } = require('./services/mentions');
 const { requireAuth } = require('./middleware/require-auth');
 const { getAppOrigin, getRedirectUri, isEnabled } = require('./services/oidc');
+const { getUploadsDir } = require('./utils/uploads');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const FUNCTION_REGION = process.env.FIREBASE_FUNCTION_REGION || 'us-central1';
+let startupPromise = null;
+
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors({
@@ -31,7 +36,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 
 // Serve uploaded images only to authenticated sessions.
-app.use('/uploads', requireAuth, express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', requireAuth, express.static(getUploadsDir()));
 
 // Routes
 app.use('/api/songs', requireAuth, require('./routes/songs'));
@@ -48,9 +53,32 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
+async function ensureStarted() {
+    if (!startupPromise) {
+        startupPromise = (async () => {
+            await initDatabase();
+            await syncAllCommentMentions();
+        })().catch((err) => {
+            startupPromise = null;
+            throw err;
+        });
+    }
+
+    return startupPromise;
+}
+
+const api = onRequest(
+    {
+        region: FUNCTION_REGION,
+    },
+    async (req, res) => {
+        await ensureStarted();
+        return app(req, res);
+    }
+);
+
 async function start() {
-    await initDatabase();
-    await syncAllCommentMentions();
+    await ensureStarted();
 
     app.listen(PORT, () => {
         console.log(`Re:Floyd server running on http://localhost:${PORT}`);
@@ -60,7 +88,16 @@ async function start() {
     });
 }
 
-start().catch((err) => {
-    console.error('Failed to start Re:Floyd server', err);
-    process.exit(1);
-});
+if (require.main === module) {
+    start().catch((err) => {
+        console.error('Failed to start Re:Floyd server', err);
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    api,
+    app,
+    ensureStarted,
+    start,
+};
